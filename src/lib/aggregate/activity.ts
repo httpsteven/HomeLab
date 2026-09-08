@@ -86,6 +86,7 @@ export async function buildActivityState(): Promise<ActivityState> {
 
     return {
       id: session.session_key || session.session_id,
+      sessionId: session.session_id || null,
       title: displayTitle(session),
       subtitle: subtitleFor(session),
       user: session.friendly_name || session.user,

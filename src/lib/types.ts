@@ -31,7 +31,17 @@ export interface Slot<T> {
  * ------------------------------------------------------------------ */
 
 export interface StreamView {
+  /** Plex sessionKey — stable per playing item, used as the React key. */
   id: string;
+  /**
+   * Plex Session.id — a DIFFERENT identifier from `id`.
+   *
+   * Terminating a stream requires this one; passing the sessionKey instead
+   * makes Plex return 404 because no session carries that id. Tautulli
+   * exposes both (`session_key` vs `session_id`) and they are easy to
+   * conflate, which is exactly what went wrong here.
+   */
+  sessionId: string | null;
   title: string;
   /** "The Bear · S03E01" style secondary line. */
   subtitle: string | null;

@@ -1,6 +1,7 @@
 import "server-only";
 import { bazarr } from "@/lib/clients/bazarr";
 import { plex } from "@/lib/clients/plex";
+import { tautulli } from "@/lib/clients/tautulli";
 import { radarr } from "@/lib/clients/radarr";
 import { sonarr } from "@/lib/clients/sonarr";
 import { invalidateMedia } from "@/lib/aggregate/media-cache";
@@ -177,14 +178,54 @@ export const ACTIONS: Record<string, Handler> = {
   /** Disruptive but not destructive — it stops a playback session, it does
       not touch any data. Confirmed in the UI before it fires. */
   "plex.terminateStream": async ({ params }) => {
-    const sessionId = str(params.sessionId, "sessionId");
-    const reason = typeof params.reason === "string" && params.reason.trim()
-      ? params.reason.trim().slice(0, 200)
-      : "Stopped from the dashboard.";
-    const result = await plex.terminateSession(sessionId, reason);
-    if (!result.ok) return { ok: false, message: result.message };
-    refreshNow("activity");
-    return { ok: true, message: "Stream stopped." };
+    const reason =
+      typeof params.reason === "string" && params.reason.trim()
+        ? params.reason.trim().slice(0, 200)
+        : "Stopped from the dashboard.";
+
+    const sessionId = typeof params.sessionId === "string" ? params.sessionId.trim() : "";
+    const sessionKey = typeof params.sessionKey === "string" ? params.sessionKey.trim() : "";
+
+    if (!sessionId && !sessionKey) {
+      throw new Error('Missing both "sessionId" and "sessionKey"');
+    }
+
+    // Plex first, using Session.id. Note this needs Plex Pass and a token
+    // belonging to the server owner.
+    if (sessionId) {
+      const result = await plex.terminateSession(sessionId, reason);
+      if (result.ok) {
+        refreshNow("activity");
+        return { ok: true, message: "Stream stopped." };
+      }
+
+      // A 404 here means "no session with that id" — it has already ended, or
+      // the id is stale. It does NOT mean the URL is wrong, so the generic
+      // transport message would be actively misleading.
+      if (result.kind !== "not-found" || !sessionKey) {
+        return {
+          ok: false,
+          message:
+            result.kind === "not-found"
+              ? "Plex has no such session — it may have already stopped."
+              : result.kind === "auth"
+                ? "Plex refused the request. Stopping a stream needs Plex Pass and the server owner's token."
+                : result.message,
+        };
+      }
+    }
+
+    // Fallback: Tautulli terminates by session_key, which is always present.
+    if (sessionKey && tautulli.available) {
+      const result = await tautulli.terminateSession(sessionKey, reason);
+      if (result.ok) {
+        refreshNow("activity");
+        return { ok: true, message: "Stream stopped." };
+      }
+      return { ok: false, message: result.message };
+    }
+
+    return { ok: false, message: "Plex has no such session — it may have already stopped." };
   },
 };
 

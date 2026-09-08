@@ -203,6 +203,20 @@ class TautulliClient {
     return this.call<PlaysByDate>("get_plays_by_date", { time_range: timeRange });
   }
 
+  /**
+   * Terminate by session_key.
+   *
+   * A fallback for Plex's own endpoint, which needs Session.id. Tautulli
+   * accepts the key we already display, so this works even when Session.id
+   * is missing from the payload.
+   */
+  terminateSession(sessionKey: string, message: string) {
+    return this.call<unknown>("terminate_session", {
+      session_key: sessionKey,
+      message,
+    });
+  }
+
   /** Proxied image URL — keeps the Tautulli key server-side. */
   imageUrl(img: string, width = 300, height = 450): string | null {
     const { url, apiKey } = this.config;

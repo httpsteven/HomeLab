@@ -301,6 +301,7 @@ export function demoActivity(): ActivityState {
   const streams: ActivityState["streams"] = [
     {
       id: "demo-1",
+      sessionId: "demo-session-1",
       title: "Severance",
       subtitle: "Severance — Season 2 · Cold Harbor",
       user: "steven",
@@ -323,6 +324,7 @@ export function demoActivity(): ActivityState {
     },
     {
       id: "demo-2",
+      sessionId: "demo-session-2",
       title: "Blade Runner 2049",
       subtitle: "2017",
       user: "guest",

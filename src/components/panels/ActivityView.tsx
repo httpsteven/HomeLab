@@ -251,7 +251,11 @@ export function ActivityView() {
                   </div>
                   <ActionButton
                     action="plex.terminateStream"
-                    params={{ sessionId: stream.id, reason: "Stopped from the dashboard." }}
+                    params={{
+                      sessionId: stream.sessionId,
+                      sessionKey: stream.id,
+                      reason: "Stopped from the dashboard.",
+                    }}
                     label="Stop"
                     variant="danger"
                     size="xs"
