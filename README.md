@@ -58,6 +58,32 @@ rather than assumed.
 
 ---
 
+## If it feels slow
+
+```bash
+curl -s http://localhost:3000/api/diag | jq
+```
+
+Reports every slot's freshness and failure count, whether each service is
+pushing or polling, and a live per-service response time. `ageSeconds` climbing on
+a slot, or a non-zero `consecutiveFailures`, names the culprit directly.
+
+Two things to check first:
+
+- **Response times in `probes`.** Anything over ~500 ms on the LAN means that service is
+  the bottleneck, not the dashboard.
+- **`hasData: false` on every slot** means nothing has loaded at all — usually a URL
+  the container can't reach. From inside Docker, `localhost` is the *container*, so
+  service URLs must be LAN IPs (`http://192.168.x.x:port`), never `localhost` or
+  `127.0.0.1`.
+
+Polling is deliberately modest: one Glances request every 3s, one Tautulli
+activity call every 2s, and the expensive library enumeration only every 10
+minutes. If you see substantially more traffic than that hitting a service,
+that's a bug worth reporting.
+
+---
+
 ## Setup
 
 ### 1. Configure
