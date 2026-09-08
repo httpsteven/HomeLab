@@ -1,0 +1,37 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Home Lab mark.
+
+    A red roofline over two stacked units: "home" above "rack". Three elements
+    only, because a favicon is read at 16px and anything finer turns to mush —
+    the roof survives as a red chevron and the bars as two ticks.
+
+    The tile is filled rather than outlined so the mark holds its own against
+    both light and dark browser chrome, instead of vanishing into one of them.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1c1c20" />
+      <stop offset="1" stop-color="#0b0b0c" />
+    </linearGradient>
+  </defs>
+
+  <rect width="32" height="32" rx="7.5" fill="url(#tile)" />
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7" stroke="#ffffff" stroke-opacity="0.10" />
+
+  <!-- Roofline — the accent, and the only colour in the mark. -->
+  <path
+    d="M8 14.5 L16 8 L24 14.5"
+    stroke="#ef5350"
+    stroke-width="2.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Two units below. The shorter second bar keeps the mark asymmetric, so
+       it doesn't read as a generic list or hamburger glyph. Roof-to-bar and
+       bar-to-bar gaps are kept close to equal, and the whole group is
+       optically centred rather than sitting low in the tile. -->
+  <rect x="9" y="16.9" width="14" height="2.9" rx="1.45" fill="#d5d3ce" />
+  <rect x="9" y="21.6" width="8.5" height="2.9" rx="1.45" fill="#8e8d87" />
+</svg>

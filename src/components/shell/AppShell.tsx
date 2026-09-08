@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { ConnectionIndicator } from "./ConnectionIndicator";
+import { Logo } from "@/components/ui/Logo";
 
 const NAV = [
   { href: "/", label: "Overview", Icon: LayoutGrid },
@@ -33,15 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-[var(--glass-border)] bg-[rgba(11,11,12,0.72)] backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6">
           <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Home lab dashboard, overview">
-            <span
-              className="grid size-7 place-items-center rounded-lg text-[13px] font-bold text-white"
-              style={{
-                background: "linear-gradient(140deg, var(--accent), var(--accent-deep))",
-              }}
-              aria-hidden
-            >
-              L
-            </span>
+            <Logo size={26} />
             <span className="hidden text-sm font-semibold tracking-tight sm:block">Home Lab</span>
           </Link>
 

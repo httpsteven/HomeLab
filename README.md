@@ -214,6 +214,20 @@ The API keys themselves are never exposed to the browser, but the actions they e
 - **History** — `data/history.jsonl`, one appended line per snapshot. No database to run; delete
   the file to reset the growth chart.
 
+### Icons
+
+The app mark lives in two places that must stay in sync: `src/app/icon.svg`
+(hardcoded colours — a favicon has no CSS to inherit) and
+`src/components/ui/Logo.tsx` (same geometry, wired to the theme tokens so the
+in-app logo follows the accent). After editing the SVG:
+
+```bash
+node scripts/make-icons.mjs
+```
+
+That regenerates the apple-touch icon and the PWA icons, including a maskable
+variant with the safe-zone padding Android's circular crop needs.
+
 ### Screenshots
 
 ```bash
