@@ -1,36 +1,179 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Home Lab Dashboard
 
-## Getting Started
+One dashboard for a Plex home lab. Aggregates **Plex, Tautulli, Sonarr, Radarr, Bazarr** and
+**Glances** into a single view: what's streaming, how full the disks are, what's eating the space,
+how long until you run out, and whether anything is broken.
 
-First, run the development server:
+Runs entirely on your own network. Every API key stays server-side — nothing is sent to the
+browser, and nothing leaves your LAN.
+
+---
+
+## What it does
+
+**Storage** — the main event. Per-mount capacity with warning thresholds, a ranked table of the
+largest movies and series (sortable by size *per episode*, which is what actually catches a season
+grabbed at remux quality), library composition, and a growth chart with a runway projection of
+when each mount fills up.
+
+**Library** — every movie and series Sonarr and Radarr track, searchable and sortable, with size,
+quality, codec, completeness and monitored state. Distribution by quality profile and codec. Plex's
+own counts are shown alongside rather than merged, so a drift between them stays visible.
+
+**Activity** — live streams with transcode detail and per-stream bandwidth, plus watch history:
+plays over time, top titles, top users.
+
+**Health** — CPU (per core), memory, temperatures, disk I/O, network and top processes from
+Glances, beside each service's own health warnings, the download queue with failures called out,
+and Bazarr's subtitle coverage.
+
+**Control** — safe actions only: refresh, rescan, search, toggle monitored, retry a stalled import,
+trigger a subtitle search, and stop a Plex stream (behind a confirmation). There is no delete,
+remove or blocklist anywhere in the codebase.
+
+---
+
+## Near real-time
+
+Browsers never poll your services. One collector in the server owns every upstream connection,
+keeps a single state snapshot, and pushes changes to browsers over SSE — so ten open tabs and a
+phone cost your lab exactly what one costs.
+
+Most of the stack can push, using the same channels their own web UIs use:
+
+| Source | Transport | Latency |
+|---|---|---|
+| Plex | WebSocket | instant |
+| Sonarr / Radarr | SignalR | instant |
+| Bazarr | Socket.IO | instant |
+| Tautulli | REST poll | 2s |
+| Glances | REST poll | 2s |
+
+Expensive calls (enumerating every movie and series) are cached for 10 minutes, and **push events
+invalidate that cache early** — so an import shows up in the numbers without polling for it.
+
+Every push source has a polling fallback and switches automatically if a socket won't hold. The
+Services panel shows `push · live` or `polling` per service, so the real-time claim is verifiable
+rather than assumed.
+
+---
+
+## Setup
+
+### 1. Configure
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in the URL and API key for each service — every one is optional, and the dashboard works with
+however many you've connected. Where to find each key is documented in `.env.example`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Run
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Open <http://localhost:3000/setup>. Each service shows connected/failed with its version and the
+specific reason for any failure — bad key, wrong address, or nothing listening. Fix anything red
+there before worrying about the rest of the dashboard.
 
-To learn more about Next.js, take a look at the following resources:
+### 3. Machine metrics (optional but recommended)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+CPU, memory, temperatures and disk I/O come from Glances, running on the media server:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker run -d --restart unless-stopped \
+  --name glances --pid host --network host \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -e GLANCES_OPT="-w" \
+  nicolargo/glances:latest-full
+```
 
-## Deploy on Vercel
+Then set `GLANCES_URL=http://<server-ip>:61208`. Without it, everything else still works — you just
+don't get machine-level stats.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Demo mode
+
+To see the dashboard populated before connecting anything:
+
+```bash
+echo "DEMO_MODE=1" > .env.local
+npm run dev
+```
+
+Generates a realistic library, storage, streams and 45 days of growth history in the exact shapes
+the real aggregators produce. No network calls. Remove the line to go back to live data.
+
+---
+
+## Deploying on the LAN
+
+### Docker (recommended)
+
+```bash
+docker compose up -d --build
+```
+
+Reachable at `http://<host-ip>:3000`. The `data/` volume holds growth history — keep it across
+redeploys or the storage chart starts over.
+
+`docker-compose.yml` also includes the Glances service. If the dashboard runs on a different
+machine than the media server, run Glances on the media server instead and point `GLANCES_URL` at
+it.
+
+### Without Docker
+
+```bash
+npm run build
+npm run start -- -H 0.0.0.0
+```
+
+Also reachable on the LAN. Note that growth snapshots only accumulate while the process is
+running, so a machine that sleeps will leave gaps.
+
+### ⚠️ There is no authentication
+
+Anyone who can reach the port gets the dashboard and its control actions. That's normally fine on
+a home network — it's how most people run Sonarr and Radarr — but:
+
+- **Don't port-forward this.** For remote access use Tailscale or a VPN, not a public port.
+- Put it behind your reverse proxy's auth if you want a password.
+
+The API keys themselves are never exposed to the browser, but the actions they enable are.
+
+---
+
+## How it's built
+
+- **Next.js 16** (App Router) + TypeScript, Tailwind v4
+- **Server-side only** service clients — `src/lib/clients/`, one per service
+- **Collector + SSE** — `src/lib/collect/`, the single source of live data
+- **Aggregators** — `src/lib/aggregate/`, normalizing five vendor shapes into one
+- **Actions** — `src/lib/actions.ts`, a fixed allowlist; the browser sends an action *name*, never
+  a URL or command, so there's no path to an arbitrary API call
+- **History** — `data/history.jsonl`, one appended line per snapshot. No database to run; delete
+  the file to reset the growth chart.
+
+### Screenshots
+
+```bash
+node scripts/shoot.mjs shots
+```
+
+Captures every page at desktop and phone widths using the system Chrome.
+
+---
+
+## Notes
+
+- Storage sizes use binary units with conventional labels (TB = TiB), matching what Sonarr, Radarr
+  and most NAS interfaces report.
+- Library size is smaller than disk usage — it counts media files only. The difference is
+  downloads, artwork, subtitles and everything else sharing the mount.
+- The runway projection is a linear least-squares fit and says so: it stays marked as unreliable
+  until there are several days of history behind it.

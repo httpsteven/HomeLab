@@ -1,0 +1,32 @@
+services:
+  dashboard:
+    build: .
+    container_name: homelab-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    volumes:
+      # Growth history — keep this so the storage chart survives redeploys.
+      - ./data:/app/data
+    depends_on:
+      - glances
+
+  # Machine metrics: CPU, memory, temperatures, disk I/O, network.
+  #
+  # host networking + pid: host are what let Glances see the real machine
+  # rather than its own container. If you run the dashboard on a different
+  # box than the media server, run this service on the media server instead
+  # and point GLANCES_URL at it.
+  glances:
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    environment:
+      - "GLANCES_OPT=-w"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/rootfs:ro
