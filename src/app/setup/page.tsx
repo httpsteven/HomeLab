@@ -22,18 +22,19 @@ const REMEDIATION: Record<string, string> = {
   unreachable:
     "Nothing is listening there. Check the host and port, that the service is running, and that this machine can reach it on the LAN.",
   timeout:
-    "A hang (rather than an instant refusal) most often means a firewall is dropping the packets, or the address points somewhere nothing is listening. If this is running in Docker, check the container can reach that host.",
+    "A hang rather than an instant refusal points at a firewall dropping packets. If the dashboard runs in Docker on the same box as this service, requests to the host's LAN IP leave the container and come back through the host firewall — use 127.0.0.1 with host networking instead.",
   "server-error": "The service answered with an error. Its own logs will say why.",
   "bad-response": "Got a response that wasn't valid JSON — usually a reverse proxy or login page in the way.",
 };
 
+/** Same-box defaults — the common case for a home lab dashboard. */
 const PORT_HINTS: Record<string, string> = {
-  plex: "http://192.168.1.x:32400",
-  tautulli: "http://192.168.1.x:8181",
-  sonarr: "http://192.168.1.x:8989",
-  radarr: "http://192.168.1.x:7878",
-  bazarr: "http://192.168.1.x:6767",
-  glances: "http://192.168.1.x:61208",
+  plex: "http://127.0.0.1:32400",
+  tautulli: "http://127.0.0.1:8181",
+  sonarr: "http://127.0.0.1:8989",
+  radarr: "http://127.0.0.1:7878",
+  bazarr: "http://127.0.0.1:6767",
+  glances: "http://127.0.0.1:61208",
 };
 
 const KEY_HINTS: Record<string, string> = {

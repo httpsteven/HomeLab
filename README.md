@@ -68,14 +68,43 @@ Reports every slot's freshness and failure count, whether each service is
 pushing or polling, and a live per-service response time. `ageSeconds` climbing on
 a slot, or a non-zero `consecutiveFailures`, names the culprit directly.
 
-Two things to check first:
+The `/setup` page shows, per service, the URL it actually resolved. If that isn't
+what you put in `.env.local`, the process is reading a different value than the file
+you edited — a stale container env or an unmounted file — and that's the whole bug.
 
-- **Response times in `probes`.** Anything over ~500 ms on the LAN means that service is
-  the bottleneck, not the dashboard.
-- **`hasData: false` on every slot** means nothing has loaded at all — usually a URL
-  the container can't reach. From inside Docker, `localhost` is the *container*, so
-  service URLs must be LAN IPs (`http://192.168.x.x:port`), never `localhost` or
-  `127.0.0.1`.
+### Some services connect, others hang
+
+Almost always the host firewall, when the dashboard runs **in Docker on the same box
+as the services**.
+
+On a bridge network, a request to the host's own LAN IP leaves the container, crosses
+the Docker bridge, and arrives at the host's LAN interface — where the host firewall
+treats it like any outside client. Ports you opened for remote access get through;
+the rest are dropped. A dropped packet **hangs until timeout**, while a genuinely
+closed port refuses *instantly* — so "two services work, the rest hang" is the
+signature of firewall rules, not of broken services.
+
+```bash
+sudo ufw status verbose     # are only some of these ports allowed?
+```
+
+Two fixes:
+
+- **Use host networking** (what `docker-compose.yml` now does) and point the URLs at
+  `http://127.0.0.1:<port>`. The container shares the host's network stack, so the
+  firewall never enters into it. Simplest, and one less network hop.
+- **Or allow Docker's bridge subnet** to reach those ports:
+  `sudo ufw allow from 172.16.0.0/12 to any port 8989 proto tcp` (repeat per port).
+
+### Nothing loads at all
+
+`hasData: false` on every slot means no source has succeeded. Check the resolved URLs
+on `/setup` first. Note that inside a *bridge-networked* container `localhost` means
+the container itself — use `127.0.0.1` only with host networking, and LAN IPs
+otherwise.
+
+- **Response times in `probes`.** Anything over ~500 ms on the LAN means that service
+  is the bottleneck, not the dashboard.
 
 Polling is deliberately modest: one Glances request every 3s, one Tautulli
 activity call every 2s, and the expensive library enumeration only every 10

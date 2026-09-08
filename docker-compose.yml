@@ -3,22 +3,44 @@ services:
     build: .
     container_name: homelab-dashboard
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+
+    # Host networking, on purpose.
+    #
+    # This dashboard normally runs on the same machine as Plex and the *arr
+    # stack. On a bridge network, a request to the host's own LAN IP leaves the
+    # container, crosses the docker bridge and comes back at the host's LAN
+    # interface — where it meets the host firewall like any outside client.
+    # Ports you opened for remote access (Plex 32400) get through; everything
+    # else is dropped, which HANGS until timeout rather than failing fast.
+    # That produces a dashboard where a couple of services work and the rest
+    # sit on loading skeletons forever.
+    #
+    # With host networking the container shares the host's stack, so services
+    # are reachable at 127.0.0.1 and the firewall never enters into it.
+    #
+    # Running the dashboard on a DIFFERENT machine from the services? Delete
+    # this line, uncomment the ports block below, and use LAN IPs in
+    # .env.local — then make sure the firewall on the services box allows
+    # this machine.
+    network_mode: host
+
+    # Only needed when NOT using host networking.
+    # ports:
+    #   - "3000:3000"
+
     env_file:
       - .env.local
     volumes:
       # Growth history — keep this so the storage chart survives redeploys.
       - ./data:/app/data
-    depends_on:
-      - glances
 
   # Machine metrics: CPU, memory, temperatures, disk I/O, network.
   #
-  # host networking + pid: host are what let Glances see the real machine
-  # rather than its own container. If you run the dashboard on a different
-  # box than the media server, run this service on the media server instead
-  # and point GLANCES_URL at it.
+  # Skip this if you already run Glances — just point GLANCES_URL at it.
+  #
+  # pid: host and network_mode: host are what let Glances see the real machine
+  # rather than its own container. Note that host networking does not work on
+  # Docker Desktop for Mac or Windows; on those, run Glances natively instead.
   glances:
     image: nicolargo/glances:latest-full
     container_name: glances
