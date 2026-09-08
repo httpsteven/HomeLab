@@ -58,8 +58,23 @@ function describe(kind: FetchFailureKind, detail: string, status?: number): stri
     case "not-found":
       return `Endpoint not found (HTTP 404). The base URL is probably missing or has an extra path segment.`;
     case "timeout":
-      return `No response within ${DEFAULT_TIMEOUT_MS / 1000}s. The service may be starting up or overloaded.`;
+      // Deliberately does NOT claim the connection was accepted — a timeout
+      // can't tell "connected but silent" from "SYN dropped by a firewall",
+      // and asserting either sends you debugging the wrong thing.
+      return `No response before the timeout. Either nothing is listening on that port, a firewall is dropping the packets, or the service is genuinely that slow. A refused connection would fail instantly instead — a hang usually means a firewall or the wrong host.`;
     case "unreachable":
+      if (detail === "ERR_INVALID_URL") {
+        return `The configured URL isn't a valid URL. Check for a stray quote, space, or missing port in the env value.`;
+      }
+      if (detail === "ECONNREFUSED") {
+        return `Connection refused — the host is reachable but nothing is listening on that port. Check the port number and that the service is running.`;
+      }
+      if (detail === "EHOSTUNREACH" || detail === "ENETUNREACH") {
+        return `No route to that host from here. If this is running in Docker, the container may not be able to reach your LAN.`;
+      }
+      if (detail === "ENOTFOUND" || detail === "EAI_AGAIN") {
+        return `Hostname could not be resolved. Use a LAN IP address instead of a name.`;
+      }
       return `Could not connect — ${detail}. Check the host, port, and that this machine can reach it on the LAN.`;
     case "server-error":
       return `The service returned HTTP ${status}.`;

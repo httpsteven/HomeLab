@@ -49,6 +49,8 @@ export async function GET() {
       slots,
       probes: probes.map((probe) => ({
         service: probe.id,
+        // The resolved base URL, so a stale container env is visible here too.
+        triedUrl: probe.baseUrl,
         configured: probe.configured,
         ok: probe.ok,
         responseMs: probe.durationMs,

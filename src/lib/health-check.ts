@@ -1,5 +1,5 @@
 import "server-only";
-import { allServices, isConfigured, type ServiceId } from "@/lib/config";
+import { allServices, getServiceConfig, isConfigured, type ServiceId } from "@/lib/config";
 import { bazarr } from "@/lib/clients/bazarr";
 import { glances } from "@/lib/clients/glances";
 import { plex } from "@/lib/clients/plex";
@@ -27,6 +27,16 @@ export interface ProbeResult {
   /** Present on failure — drives the specific remediation hint in the UI. */
   kind?: string;
   envVars: string[];
+  /**
+   * The base URL actually used, as the server resolved it.
+   *
+   * Shown in the UI because the single most common cause of "it's configured
+   * but not working" is that the running process is reading a different value
+   * than the one you think you edited — a stale container env, an unmounted
+   * .env.local, a typo'd octet. Guessing at that is miserable; seeing it is
+   * instant. Contains no secret: the key is never included.
+   */
+  baseUrl: string | null;
 }
 
 const ENV_VARS: Record<ServiceId, string[]> = {
@@ -56,6 +66,7 @@ function toProbe(
     durationMs: result.durationMs,
     kind: result.ok ? undefined : result.kind,
     envVars: ENV_VARS[id],
+    baseUrl: getServiceConfig(id).url,
   };
 }
 
@@ -71,6 +82,7 @@ async function probeService(id: ServiceId, label: string, configured: boolean): 
       durationMs: 0,
       kind: "not-configured",
       envVars: ENV_VARS[id],
+      baseUrl: getServiceConfig(id).url,
     };
   }
 

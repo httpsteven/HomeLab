@@ -21,7 +21,8 @@ const REMEDIATION: Record<string, string> = {
     "Reached a server, but not this service's API. Check for an extra path on the URL — it should be just http://host:port.",
   unreachable:
     "Nothing is listening there. Check the host and port, that the service is running, and that this machine can reach it on the LAN.",
-  timeout: "The service accepted the connection but never answered. It may still be starting up.",
+  timeout:
+    "A hang (rather than an instant refusal) most often means a firewall is dropping the packets, or the address points somewhere nothing is listening. If this is running in Docker, check the container can reach that host.",
   "server-error": "The service answered with an error. Its own logs will say why.",
   "bad-response": "Got a response that wasn't valid JSON — usually a reverse proxy or login page in the way.",
 };
@@ -89,13 +90,23 @@ function ServiceCard({ probe }: { probe: ProbeResult }) {
           </div>
         )}
 
-        <div className="flex flex-col gap-1 border-t border-[var(--glass-border)] pt-2.5">
-          {probe.envVars.map((variable) => (
-            <code key={variable} className="metric text-[11px] text-ink-faint">
-              {variable}
-              {variable.endsWith("_URL") ? `=${PORT_HINTS[probe.id]}` : "=…"}
+        <div className="flex flex-col gap-1.5 border-t border-[var(--glass-border)] pt-2.5">
+          {/* The URL the server actually resolved — not an example. If this
+              isn't what you put in .env.local, the process is reading a
+              different file than you edited, which is by far the most common
+              cause of "configured but failing". */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] font-medium tracking-wide text-ink-faint uppercase">
+              Tried
+            </span>
+            <code className="metric truncate text-[11px] text-ink-secondary">
+              {probe.baseUrl ?? "— nothing configured —"}
             </code>
-          ))}
+          </div>
+          <code className="metric text-[10px] text-ink-faint">
+            {probe.envVars.join(" · ")}
+            {probe.baseUrl ? "" : ` — example: ${PORT_HINTS[probe.id]}`}
+          </code>
         </div>
       </div>
     </Panel>
