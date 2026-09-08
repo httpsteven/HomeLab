@@ -158,7 +158,13 @@ export interface LibraryState {
   plexLibraries: { name: string; type: string; count: number; childCount: number | null }[];
   byQuality: QualityBucket[];
   byCodec: QualityBucket[];
-  items: LibraryItem[];
+  /**
+   * Item count only. The item ARRAY is deliberately not part of the live
+   * state: on a real library it is hundreds of KB, and the store broadcasts a
+   * whole slot on every refresh, to every connected client. It is served
+   * on demand from /api/library-items instead.
+   */
+  itemCount: number;
 }
 
 /* ------------------------------------------------------------------ *

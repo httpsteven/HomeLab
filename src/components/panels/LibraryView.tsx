@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { RefreshCw, Search } from "lucide-react";
 import { useSlot } from "@/components/DashboardProvider";
 import { Freshness } from "@/components/shell/ConnectionIndicator";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { StackedBar } from "@/components/ui/CapacityBar";
 import { NotConfigured, Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
 import { InfoNote } from "@/components/ui/Status";
+import { SortButton, ariaSort } from "@/components/ui/SortButton";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatNumber, formatPercent } from "@/lib/format";
 import type { LibraryItem, QualityBucket } from "@/lib/types";
@@ -102,6 +103,35 @@ function Distribution({ title, buckets }: { title: string; buckets: QualityBucke
 type SortKey = "title" | "size" | "completeness" | "added";
 type KindFilter = "all" | "movie" | "series";
 
+/**
+ * Fetches the full item list once per mount.
+ *
+ * The live state carries counts, not the array — see LibraryState.itemCount.
+ */
+function useLibraryItems() {
+  const [items, setItems] = useState<LibraryItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/library-items")
+      .then((response) => response.json())
+      .then((payload: { items: LibraryItem[]; error: string | null }) => {
+        if (cancelled) return;
+        setItems(payload.items ?? []);
+        setError(payload.error);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load the library list.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { items, error };
+}
+
 function ItemTable({ items }: { items: LibraryItem[] }) {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -143,23 +173,6 @@ function ItemTable({ items }: { items: LibraryItem[] }) {
       setDescending(key !== "title");
     }
   };
-
-  const SortButton = ({ column, label }: { column: SortKey; label: string }) => (
-    <button
-      type="button"
-      onClick={() => toggleSort(column)}
-      className={cn(
-        "flex items-center gap-1 transition-colors hover:text-ink",
-        sortKey === column ? "text-ink" : "text-ink-muted",
-      )}
-      aria-sort={sortKey === column ? (descending ? "descending" : "ascending") : "none"}
-    >
-      {label}
-      {sortKey === column ? (
-        descending ? <ArrowDown size={11} aria-hidden /> : <ArrowUp size={11} aria-hidden />
-      ) : null}
-    </button>
-  );
 
   const visible = rows.slice(0, limit);
 
@@ -214,18 +227,45 @@ function ItemTable({ items }: { items: LibraryItem[] }) {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-[var(--glass-border)]">
-              <th className="py-2 pr-3 text-left text-[11px] font-medium">
-                <SortButton column="title" label="Title" />
+              <th
+                className="py-2 pr-3 text-left text-[11px] font-medium"
+                aria-sort={ariaSort(sortKey === "title", descending)}
+              >
+                <SortButton
+                  column="title"
+                  label="Title"
+                  activeColumn={sortKey}
+                  descending={descending}
+                  onSort={toggleSort}
+                />
               </th>
               <th className="py-2 pr-3 text-left text-[11px] font-medium text-ink-muted">Quality</th>
-              <th className="py-2 pr-3 text-right text-[11px] font-medium">
+              <th
+                className="py-2 pr-3 text-right text-[11px] font-medium"
+                aria-sort={ariaSort(sortKey === "completeness", descending)}
+              >
                 <span className="flex justify-end">
-                  <SortButton column="completeness" label="Complete" />
+                  <SortButton
+                    column="completeness"
+                    label="Complete"
+                    activeColumn={sortKey}
+                    descending={descending}
+                    onSort={toggleSort}
+                  />
                 </span>
               </th>
-              <th className="py-2 pr-3 text-right text-[11px] font-medium">
+              <th
+                className="py-2 pr-3 text-right text-[11px] font-medium"
+                aria-sort={ariaSort(sortKey === "size", descending)}
+              >
                 <span className="flex justify-end">
-                  <SortButton column="size" label="Size" />
+                  <SortButton
+                    column="size"
+                    label="Size"
+                    activeColumn={sortKey}
+                    descending={descending}
+                    onSort={toggleSort}
+                  />
                 </span>
               </th>
               <th className="w-[190px] py-2 text-right text-[11px] font-medium text-ink-muted">
@@ -378,6 +418,7 @@ function ItemTable({ items }: { items: LibraryItem[] }) {
 export function LibraryView() {
   const slot = useSlot("library");
   const library = slot.data;
+  const { items, error: itemsError } = useLibraryItems();
 
   if (slot.status === "not-configured") {
     return (
@@ -489,9 +530,15 @@ export function LibraryView() {
       <Distribution title="By codec" buckets={library.byCodec} />
 
       <Panel span="full">
-        <PanelHeader title="Everything" meta={`${formatNumber(library.items.length)} titles`} />
+        <PanelHeader title="Everything" meta={`${formatNumber(library.itemCount)} titles`} />
         <PanelBody>
-          <ItemTable items={library.items} />
+          {itemsError ? (
+            <p className="py-8 text-center text-sm text-ink-muted">{itemsError}</p>
+          ) : items === null ? (
+            <div className="skeleton h-64 w-full" />
+          ) : (
+            <ItemTable items={items} />
+          )}
         </PanelBody>
       </Panel>
     </>

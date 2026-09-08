@@ -5,7 +5,6 @@ import { plex } from "@/lib/clients/plex";
 import { radarr } from "@/lib/clients/radarr";
 import { sonarr } from "@/lib/clients/sonarr";
 import { invalidateMedia } from "@/lib/aggregate/media-cache";
-import type { ServiceId } from "@/lib/config";
 import { refreshNow, refreshSoon } from "./collector";
 import { setPushMode } from "./push-state";
 

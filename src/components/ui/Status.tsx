@@ -14,36 +14,53 @@ import { cn } from "@/lib/cn";
 
 export type StatusLevel = "good" | "warning" | "serious" | "critical" | "unknown";
 
+/**
+ * `color` is the identity colour (used for dots, fills and meters, where the
+ * 3:1 graphic floor applies). `textColor` is what a label actually renders in
+ * — identical except for critical, whose saturated step is too dark to carry
+ * 11px text at 4.5:1.
+ */
 const STATUS_META: Record<
   StatusLevel,
-  { color: string; dim: string; Icon: typeof CheckCircle2; defaultLabel: string }
+  {
+    color: string;
+    textColor: string;
+    dim: string;
+    Icon: typeof CheckCircle2;
+    defaultLabel: string;
+  }
 > = {
   good: {
     color: "var(--status-good)",
+    textColor: "var(--status-good)",
     dim: "var(--status-good-dim)",
     Icon: CheckCircle2,
     defaultLabel: "OK",
   },
   warning: {
     color: "var(--status-warning)",
+    textColor: "var(--status-warning)",
     dim: "var(--status-warning-dim)",
     Icon: AlertTriangle,
     defaultLabel: "Warning",
   },
   serious: {
     color: "var(--status-serious)",
+    textColor: "var(--status-serious)",
     dim: "var(--status-serious-dim)",
     Icon: AlertTriangle,
     defaultLabel: "Degraded",
   },
   critical: {
     color: "var(--status-critical)",
+    textColor: "var(--status-critical-text)",
     dim: "var(--status-critical-dim)",
     Icon: XCircle,
     defaultLabel: "Critical",
   },
   unknown: {
     color: "var(--text-muted)",
+    textColor: "var(--text-muted)",
     dim: "transparent",
     Icon: CircleSlash,
     defaultLabel: "Unknown",
@@ -74,7 +91,7 @@ export function StatusBadge({
         compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs",
         className,
       )}
-      style={{ background: meta.dim, color: meta.color }}
+      style={{ background: meta.dim, color: meta.textColor }}
     >
       <Icon size={compact ? 11 : 13} strokeWidth={2.5} aria-hidden />
       <span>{text}</span>

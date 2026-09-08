@@ -1,6 +1,6 @@
 import "server-only";
 import { getServiceConfig, isConfigured } from "@/lib/config";
-import { notConfigured, qs, request, type Result } from "@/lib/http";
+import { FAST_TIMEOUT_MS, notConfigured, qs, request, type Result } from "@/lib/http";
 
 /**
  * Tautulli client.
@@ -129,6 +129,9 @@ class TautulliClient {
 
     const result = await request<TautulliEnvelope<T>>(
       `${url}/api/v2${qs({ apikey: apiKey, cmd, out_type: "json", ...params })}`,
+      // get_activity runs on the 2s cadence; the heavier history calls are
+      // on-demand and can have the normal budget.
+      { timeoutMs: cmd === "get_activity" ? FAST_TIMEOUT_MS : undefined },
     );
 
     if (!result.ok) return result;

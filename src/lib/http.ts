@@ -40,6 +40,16 @@ export type Result<T> = FetchSuccess<T> | FetchFailure;
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
+/**
+ * Timeout for sources on a fast cadence.
+ *
+ * A 2s poll must never wait 10s: the source would spend its whole life
+ * blocked on a dead host, produce nothing, and leave every tile showing a
+ * loading skeleton — which reads to the user as "the dashboard is broken"
+ * rather than "one service is down".
+ */
+export const FAST_TIMEOUT_MS = 4_000;
+
 /** Messages written for someone debugging their own lab at 1am. */
 function describe(kind: FetchFailureKind, detail: string, status?: number): string {
   switch (kind) {

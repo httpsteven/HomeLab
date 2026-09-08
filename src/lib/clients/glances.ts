@@ -1,6 +1,6 @@
 import "server-only";
 import { getServiceConfig, glancesApiVersion, isConfigured } from "@/lib/config";
-import { notConfigured, request, type Result } from "@/lib/http";
+import { FAST_TIMEOUT_MS, notConfigured, request, type Result } from "@/lib/http";
 
 /**
  * Glances client — machine metrics (CPU, RAM, temps, disk I/O, network).
@@ -98,6 +98,22 @@ export interface GlancesSystem {
   linux_distro?: string;
 }
 
+/** Shape of /api/{v}/all — the plugins this dashboard reads. */
+export interface GlancesAll {
+  cpu?: GlancesCpu;
+  mem?: GlancesMem;
+  memswap?: GlancesSwap;
+  load?: GlancesLoad;
+  sensors?: GlancesSensor[];
+  network?: GlancesNetwork[];
+  diskio?: GlancesDiskIO[];
+  uptime?: string;
+  system?: GlancesSystem;
+  percpu?: { cpu_number: number; total: number }[];
+  processlist?: GlancesProcess[];
+  fs?: GlancesFs[];
+}
+
 class GlancesClient {
   /** Cached after the first successful probe. */
   private resolvedVersion: number | null = null;
@@ -116,7 +132,8 @@ class GlancesClient {
 
   private async attempt<T>(version: number, endpoint: string): Promise<Result<T>> {
     const { url } = this.config;
-    return request<T>(`${url}/api/${version}/${endpoint}`);
+    // Glances sits on the 2s cadence, so it gets the short timeout.
+    return request<T>(`${url}/api/${version}/${endpoint}`, { timeoutMs: FAST_TIMEOUT_MS });
   }
 
   async call<T>(endpoint: string): Promise<Result<T>> {
@@ -148,6 +165,17 @@ class GlancesClient {
       return second;
     }
     return first;
+  }
+
+  /**
+   * Every plugin in ONE request.
+   *
+   * This replaces eleven separate round trips per poll. At a 2s cadence that
+   * was 330 requests a minute against the server just to draw one panel —
+   * enough to make both the dashboard and the machine it's watching crawl.
+   */
+  all() {
+    return this.call<GlancesAll>("all");
   }
 
   cpu() {

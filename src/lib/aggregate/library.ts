@@ -40,7 +40,7 @@ function normalizeCodec(codec: string | null | undefined): string {
   return codec.toUpperCase();
 }
 
-export async function buildLibraryState(): Promise<LibraryState> {
+async function buildLibraryStateInternal(): Promise<LibraryState & { items: LibraryItem[] }> {
   const [movies, series, profilesMovies, profilesSeries, plexLibs] = await Promise.all([
     getMovies(),
     getSeries(),
@@ -177,6 +177,24 @@ export async function buildLibraryState(): Promise<LibraryState> {
     plexLibraries,
     byQuality: sortBuckets(byQuality),
     byCodec: sortBuckets(byCodec),
+    itemCount: items.length,
     items: items.sort((a, b) => a.title.localeCompare(b.title)),
   };
+}
+
+/**
+ * The full item list, for the on-demand endpoint.
+ *
+ * Reads the same 10-minute media cache as buildLibraryState, so asking for
+ * this costs nothing extra upstream.
+ */
+export async function buildLibraryItems(): Promise<LibraryItem[]> {
+  const state = await buildLibraryStateInternal();
+  return state.items;
+}
+
+export async function buildLibraryState(): Promise<LibraryState> {
+  const { items, ...state } = await buildLibraryStateInternal();
+  void items;
+  return state;
 }

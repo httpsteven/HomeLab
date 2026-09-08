@@ -55,6 +55,8 @@ function displayTitle(session: StreamSession): string {
   return session.title || session.full_title;
 }
 
+export class ActivityUnavailableError extends Error {}
+
 export async function buildActivityState(): Promise<ActivityState> {
   const result = await tautulli.activity();
 
@@ -67,7 +69,11 @@ export async function buildActivityState(): Promise<ActivityState> {
     accent: null,
   };
 
-  if (!result.ok || !result.data) return empty;
+  // A reachable Tautulli with nothing playing is an empty result, which is
+  // fine. An unreachable one must surface as a failure so the collector backs
+  // off instead of retrying a dead host every 2 seconds forever.
+  if (!result.ok) throw new ActivityUnavailableError(result.message);
+  if (!result.data) return empty;
 
   const activity = result.data;
   const sessions = activity.sessions ?? [];

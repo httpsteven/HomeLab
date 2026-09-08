@@ -64,9 +64,31 @@ const SERIES_TITLES = [
 const QUALITIES = ["Bluray-2160p", "Bluray-1080p", "WEBDL-2160p", "WEBDL-1080p", "WEBRip-1080p", "Bluray-720p"];
 const CODECS = ["HEVC / H.265", "H.264", "AV1"];
 
+/**
+ * Filler naming for the padding entries beyond the named lists.
+ *
+ * Sequel-style numerals read as plausible titles; a bare "The Wire 3" reads
+ * as a bug. Years are derived from the base title's index so a given title
+ * always carries the same year instead of shuffling on every regeneration.
+ */
+const NUMERALS = ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+
+function fillerTitle(pool: string[], index: number): string {
+  const base = pool[index % pool.length];
+  const cycle = Math.floor(index / pool.length);
+  return cycle === 0 ? base : `${base} ${NUMERALS[(cycle - 1) % NUMERALS.length]}`;
+}
+
+function stableYear(pool: string[], index: number, from: number, to: number): number {
+  const base = index % pool.length;
+  const cycle = Math.floor(index / pool.length);
+  // Spread base titles across the range, then nudge sequels a few years on.
+  return from + ((base * 7) % (to - from)) + Math.min(cycle * 2, 6);
+}
+
 /* ------------------------------------------------------------------ */
 
-export function demoLibrary(): LibraryState {
+function demoLibraryFull(): LibraryState & { items: LibraryItem[] } {
   const items: LibraryItem[] = [];
   const random = seeded(42);
 
@@ -76,10 +98,7 @@ export function demoLibrary(): LibraryState {
 
   // 1,284 movies: the named ones plus filler, so tables and counts are real.
   for (let index = 0; index < 1284; index += 1) {
-    const title =
-      index < MOVIE_TITLES.length
-        ? MOVIE_TITLES[index]
-        : `${MOVIE_TITLES[index % MOVIE_TITLES.length]} ${Math.floor(index / MOVIE_TITLES.length) + 1}`;
+    const title = fillerTitle(MOVIE_TITLES, index);
 
     const roll = random();
     const hasFile = roll > 0.06;
@@ -97,7 +116,7 @@ export function demoLibrary(): LibraryState {
       id: index + 1,
       kind: "movie",
       title,
-      year: 1975 + Math.floor(random() * 50),
+      year: stableYear(MOVIE_TITLES, index, 1975, 2024),
       size,
       monitored,
       completeness: hasFile ? 1 : 0,
@@ -119,10 +138,7 @@ export function demoLibrary(): LibraryState {
   let ended = 0;
 
   for (let index = 0; index < 96; index += 1) {
-    const title =
-      index < SERIES_TITLES.length
-        ? SERIES_TITLES[index]
-        : `${SERIES_TITLES[index % SERIES_TITLES.length]} ${Math.floor(index / SERIES_TITLES.length) + 1}`;
+    const title = fillerTitle(SERIES_TITLES, index);
 
     const episodes = 8 + Math.floor(random() * 80);
     const files = Math.max(0, episodes - Math.floor(random() * 6));
@@ -141,7 +157,7 @@ export function demoLibrary(): LibraryState {
       id: 10000 + index,
       kind: "series",
       title,
-      year: 1999 + Math.floor(random() * 26),
+      year: stableYear(SERIES_TITLES, index, 1999, 2024),
       size,
       monitored,
       completeness: episodes > 0 ? files / episodes : 0,
@@ -199,11 +215,24 @@ export function demoLibrary(): LibraryState {
     ],
     byQuality: [...qualityMap.values()].sort((a, b) => b.bytes - a.bytes),
     byCodec: [...codecMap.values()].sort((a, b) => b.bytes - a.bytes),
+    itemCount: items.length,
     items: items.sort((a, b) => a.title.localeCompare(b.title)),
   };
 }
 
+/** Mirrors the real split: the streamed state carries counts, not the array. */
+export function demoLibrary(): LibraryState {
+  const { items, ...state } = demoLibraryFull();
+  void items;
+  return state;
+}
+
+export function demoLibraryItems(): LibraryItem[] {
+  return demoLibraryFull().items;
+}
+
 export function demoStorage(library: LibraryState): StorageState {
+  const full = demoLibraryFull();
   // Disk usage is derived from library size (plus ~6% for artwork, subtitles
   // and stray files) so the numbers agree with each other the way they would
   // on a real server. Hardcoding both would let them drift apart and make the
@@ -233,7 +262,7 @@ export function demoStorage(library: LibraryState): StorageState {
     { capacity: 0, used: 0, free: 0 },
   );
 
-  const largest = library.items
+  const largest = full.items
     .filter((item) => item.size > 0)
     .map((item) => ({
       id: item.id,
@@ -334,19 +363,25 @@ export function demoMachine(): MachineState {
   const wave = (offset: number, amplitude: number, base: number) =>
     base + Math.sin(Date.now() / 12000 + offset) * amplitude + Math.random() * 3;
 
+  const perCore = Array.from({ length: 12 }, (_, index) =>
+    Math.max(1, Math.min(99, wave(index, 22, 25))),
+  );
+  // Total is the mean of the cores rather than its own wave — otherwise the
+  // headline reads 13% while half the core bars sit at 40%, which looks like
+  // a bug in the dashboard rather than a quirk of the fixture.
+  const cpuTotal = perCore.reduce((sum, value) => sum + value, 0) / perCore.length;
+
   return {
     hostname: "vault",
     os: "Ubuntu 24.04.1 LTS",
     uptime: "42 days, 6:18:04",
     cpu: {
-      total: Math.max(2, Math.min(98, wave(0, 14, 26))),
-      user: 18.4,
-      system: 6.1,
+      total: cpuTotal,
+      user: cpuTotal * 0.68,
+      system: cpuTotal * 0.24,
       iowait: 1.2,
     },
-    perCore: Array.from({ length: 12 }, (_, index) =>
-      Math.max(1, Math.min(99, wave(index, 22, 25))),
-    ),
+    perCore,
     load: { min1: 2.14, min5: 1.87, min15: 1.62, cores: 12 },
     memory: {
       total: 64 * GB,
@@ -459,7 +494,7 @@ export function demoHistory(): HistorySnapshot[] {
 
   // Work backwards from today's real totals so the history line lands exactly
   // where the current numbers are, instead of ending somewhere else.
-  const library = demoLibrary();
+  const library = demoLibraryFull();
   const endMovies = library.movies.bytes;
   const endSeries = library.series.bytes;
 

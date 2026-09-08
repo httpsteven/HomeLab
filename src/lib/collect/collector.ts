@@ -85,8 +85,11 @@ const SOURCES: Source[] = [
     run: buildActivityState,
   },
   {
+    // 3s rather than 2s: this is now a single /api/all request, and Glances
+    // does real work to answer it (processlist especially). Three seconds is
+    // still well inside "live" for CPU and memory.
     key: "machine",
-    intervalMs: 2_000,
+    intervalMs: 3_000,
     requiresClients: true,
     isConfigured: () => glances.available,
     run: buildMachineState,

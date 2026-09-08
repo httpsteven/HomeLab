@@ -70,7 +70,12 @@ export function projectRunway(
 
     const bytesPerDay = denominator === 0 ? 0 : (numerator / denominator) * 86_400_000;
     const remaining = Math.max(mount.total - mount.used, 0);
-    const daysRemaining = bytesPerDay > 0 ? remaining / bytesPerDay : null;
+
+    // Past ~5 years the projection is noise dressed up as a number — a mount
+    // creeping along at 60 MB/day is not "full on Oct 11, 2097", it just
+    // isn't filling up. Report no runway rather than false precision.
+    const rawDays = bytesPerDay > 0 ? remaining / bytesPerDay : null;
+    const daysRemaining = rawDays !== null && rawDays <= 1825 ? rawDays : null;
 
     return {
       path: mount.path,

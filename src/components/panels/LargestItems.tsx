@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowDown, ArrowUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatNumber } from "@/lib/format";
 import type { LargestItem } from "@/lib/types";
+import { SortButton, ariaSort } from "@/components/ui/SortButton";
 
 /**
  * "What's eating the space" — ranked, sortable.
@@ -56,28 +56,6 @@ export function LargestItems({ items, limit = 40 }: { items: LargestItem[]; limi
     }
   };
 
-  const SortButton = ({ column, label }: { column: SortKey; label: string }) => (
-    <button
-      type="button"
-      onClick={() => toggleSort(column)}
-      className={cn(
-        "flex items-center gap-1 transition-colors hover:text-ink",
-        sortKey === column ? "text-ink" : "text-ink-muted",
-      )}
-      aria-label={`Sort by ${label}`}
-      aria-sort={sortKey === column ? (descending ? "descending" : "ascending") : "none"}
-    >
-      {label}
-      {sortKey === column ? (
-        descending ? (
-          <ArrowDown size={11} aria-hidden />
-        ) : (
-          <ArrowUp size={11} aria-hidden />
-        )
-      ) : null}
-    </button>
-  );
-
   return (
     <div className="flex flex-col gap-3">
       {/* Filters in one row above the data. */}
@@ -95,7 +73,7 @@ export function LargestItems({ items, limit = 40 }: { items: LargestItem[]; limi
                   : "text-ink-muted hover:text-ink-secondary",
               )}
             >
-              {value === "all" ? "All" : `${value}s`}
+              {value === "all" ? "All" : value === "movie" ? "Movies" : "Series"}
             </button>
           ))}
         </div>
@@ -116,18 +94,45 @@ export function LargestItems({ items, limit = 40 }: { items: LargestItem[]; limi
           <thead>
             <tr className="border-b border-[var(--glass-border)]">
               <th className="w-8 py-2 pr-2 text-left text-[11px] font-medium text-ink-faint">#</th>
-              <th className="py-2 pr-3 text-left text-[11px] font-medium">
-                <SortButton column="title" label="Title" />
+              <th
+                className="py-2 pr-3 text-left text-[11px] font-medium"
+                aria-sort={ariaSort(sortKey === "title", descending)}
+              >
+                <SortButton
+                  column="title"
+                  label="Title"
+                  activeColumn={sortKey}
+                  descending={descending}
+                  onSort={toggleSort}
+                />
               </th>
               <th className="py-2 pr-3 text-left text-[11px] font-medium text-ink-muted">Quality</th>
-              <th className="py-2 pr-3 text-right text-[11px] font-medium">
+              <th
+                className="py-2 pr-3 text-right text-[11px] font-medium"
+                aria-sort={ariaSort(sortKey === "sizePerEpisode", descending)}
+              >
                 <span className="flex justify-end">
-                  <SortButton column="sizePerEpisode" label="Per episode" />
+                  <SortButton
+                    column="sizePerEpisode"
+                    label="Per episode"
+                    activeColumn={sortKey}
+                    descending={descending}
+                    onSort={toggleSort}
+                  />
                 </span>
               </th>
-              <th className="py-2 text-right text-[11px] font-medium">
+              <th
+                className="py-2 text-right text-[11px] font-medium"
+                aria-sort={ariaSort(sortKey === "size", descending)}
+              >
                 <span className="flex justify-end">
-                  <SortButton column="size" label="Size" />
+                  <SortButton
+                    column="size"
+                    label="Size"
+                    activeColumn={sortKey}
+                    descending={descending}
+                    onSort={toggleSort}
+                  />
                 </span>
               </th>
             </tr>

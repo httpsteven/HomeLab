@@ -24,10 +24,11 @@ export function ConnectionIndicator() {
   const { status, lastEventAt } = useDashboard();
   const meta = LABELS[status];
 
-  // Re-render on a timer so the "3s ago" label doesn't freeze between events.
-  const [, setTick] = useState(0);
+  // Clock held in state and advanced on a timer, so the "3s ago" label keeps
+  // counting between events without reading Date.now() during render.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -38,7 +39,7 @@ export function ConnectionIndicator() {
       aria-live="polite"
       title={
         lastEventAt
-          ? `Last update ${formatRelativeTime(lastEventAt)}`
+          ? `Last update ${formatRelativeTime(lastEventAt, now)}`
           : "Waiting for the first update"
       }
     >
@@ -52,7 +53,7 @@ export function ConnectionIndicator() {
       </span>
       {status === "live" && lastEventAt ? (
         <span className="metric hidden text-[10px] text-ink-faint sm:inline">
-          {formatRelativeTime(lastEventAt)}
+          {formatRelativeTime(lastEventAt, now)}
         </span>
       ) : null}
     </div>
@@ -72,16 +73,19 @@ export function Freshness({
   mode?: string;
   className?: string;
 }) {
-  const [, setTick] = useState(0);
+  // `now` is state advanced by the interval rather than a Date.now() call in
+  // render. Reading the clock during render is impure — the displayed age
+  // would then only change when the component happened to re-render for some
+  // other reason, so a frozen tile could quietly show a fresh timestamp.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), 5000);
+    const timer = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(timer);
   }, []);
 
   if (!fetchedAt) return null;
 
-  const age = Date.now() - fetchedAt;
-  const stale = age > 120_000;
+  const stale = now - fetchedAt > 120_000;
 
   return (
     <span
@@ -89,7 +93,7 @@ export function Freshness({
       style={{ color: stale ? "var(--status-warning)" : "var(--text-faint)" }}
     >
       {mode === "push" ? "live · " : ""}
-      {formatRelativeTime(fetchedAt)}
+      {formatRelativeTime(fetchedAt, now)}
     </span>
   );
 }

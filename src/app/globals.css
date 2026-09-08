@@ -32,10 +32,16 @@
   --glass-blur: 14px;
 
   /* --- Ink ---------------------------------------------------------------- */
+  /* Contrast-verified against --surface-2 (#16181f), the surface these
+     actually sit on. Measured, not eyeballed:
+       primary   17.7:1   secondary 9.9:1   muted 6.4:1   faint 4.5:1
+     The original faint (#5f5e5a) measured 2.7:1 and failed even the 3:1
+     graphic floor — unusable for the 10-11px metadata it carries. Muted was
+     lightened alongside it to keep four distinguishable levels. */
   --text-primary: #ffffff;
   --text-secondary: #c3c2b7;
-  --text-muted: #8b8a84;
-  --text-faint: #5f5e5a;
+  --text-muted: #9d9c95;
+  --text-faint: #82817b;
 
   /* --- Chart chrome ------------------------------------------------------- */
   --gridline: #23252c;
@@ -73,10 +79,20 @@
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
 
-  --status-good-dim: rgba(12, 163, 12, 0.14);
-  --status-warning-dim: rgba(250, 178, 25, 0.14);
-  --status-serious-dim: rgba(236, 131, 90, 0.14);
-  --status-critical-dim: rgba(208, 59, 59, 0.14);
+  /* 0.10 rather than 0.14: the tint lightens the badge background toward the
+     status hue, which eats the very contrast the badge text needs. Measured
+     on the composited result — good 4.7:1, warning 8.1:1, serious 5.8:1. */
+  --status-good-dim: rgba(12, 163, 12, 0.10);
+  --status-warning-dim: rgba(250, 178, 25, 0.10);
+  --status-serious-dim: rgba(236, 131, 90, 0.10);
+  --status-critical-dim: rgba(208, 59, 59, 0.10);
+
+  /* Critical is the one status whose fill colour can't also serve as small
+     text — #d03b3b measures 3.4:1 on its own tint, fine for a 3:1 graphic
+     (bars, meters) but short of 4.5:1 for an 11px label. This lighter step of
+     the same hue measures 4.9:1 and is used for TEXT only, so meaning and
+     colour identity stay put while the label stays readable. */
+  --status-critical-text: #e66767;
 
   /* --- Ambient accent (dynamic, decorative only) --------------------------
      Overwritten at runtime from the now-playing poster. Neutral when idle. */

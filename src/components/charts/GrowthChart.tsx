@@ -4,6 +4,8 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Label,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -75,7 +77,14 @@ function ChartTooltip({
   );
 }
 
-export function GrowthChart({ history }: { history: HistorySnapshot[] }) {
+export function GrowthChart({
+  history,
+  /** Total capacity across all mounts, drawn as the ceiling. */
+  capacity,
+}: {
+  history: HistorySnapshot[];
+  capacity?: number;
+}) {
   const data: Point[] = history.map((snapshot) => ({
     t: snapshot.t,
     movies: snapshot.libraryBytes.movies,
@@ -96,6 +105,12 @@ export function GrowthChart({ history }: { history: HistorySnapshot[] }) {
   }
 
   const latest = data[data.length - 1];
+
+  // Headroom to the ceiling gives the curve meaning. Without it a library
+  // creeping from 41 to 44 TB reads as a flat slab — technically accurate and
+  // completely uninformative about whether you're running out.
+  const ceiling = capacity && capacity > latest.total ? capacity : undefined;
+  const yMax = ceiling ? ceiling * 1.04 : undefined;
 
   return (
     <div className="flex flex-col gap-3">
@@ -159,7 +174,28 @@ export function GrowthChart({ history }: { history: HistorySnapshot[] }) {
               tickLine={false}
               axisLine={false}
               width={56}
+              domain={yMax ? [0, yMax] : undefined}
             />
+
+            {/* The ceiling. A dashed reference line reads as a limit rather
+                than as another data series. */}
+            {ceiling ? (
+              <ReferenceLine
+                y={ceiling}
+                stroke="var(--status-warning)"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                ifOverflow="extendDomain"
+              >
+                <Label
+                  value={`Capacity ${formatBytes(ceiling, 1)}`}
+                  position="insideTopRight"
+                  fill="var(--status-warning)"
+                  fontSize={10}
+                  offset={6}
+                />
+              </ReferenceLine>
+            ) : null}
 
             <Tooltip
               content={<ChartTooltip />}

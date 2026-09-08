@@ -72,9 +72,10 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
                       +{formatBytes(projection.bytesPerDay)}/day · full in{" "}
                       <span
                         style={{
+                          // Text, not a fill — uses the readable critical step.
                           color:
                             projection.daysRemaining < 30
-                              ? "var(--status-critical)"
+                              ? "var(--status-critical-text)"
                               : projection.daysRemaining < 90
                                 ? "var(--status-warning)"
                                 : "var(--text-secondary)",
@@ -158,7 +159,7 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
           meta={history.length ? `${history.length} snapshots` : "no history yet"}
         />
         <PanelBody className="flex flex-col gap-4">
-          <GrowthChart history={history} />
+          <GrowthChart history={history} capacity={storage?.totals.capacity} />
 
           {runway.length > 0 ? (
             <div className="grid grid-cols-1 gap-2 border-t border-[var(--glass-border)] pt-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -182,7 +183,9 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
                       </p>
                     ) : projection.daysRemaining === null ? (
                       <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-                        Not growing — no runway to project.
+                        {projection.bytesPerDay > 0
+                          ? "Growing too slowly to run out — years of headroom."
+                          : "Not growing — no runway to project."}
                       </p>
                     ) : (
                       <>

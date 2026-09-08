@@ -32,8 +32,10 @@ function StreamCard({ stream }: { stream: StreamView }) {
   return (
     <article className="flex gap-3 rounded-xl bg-surface-2 p-3">
       {stream.posterUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- proxied through
-        // our own route, and Next's optimizer can't reach the LAN host anyway.
+        /* Plain <img>, not next/image: the source is our own proxy route
+           serving bytes from a LAN host the optimizer can't reach, and these
+           are 56px thumbnails where optimization buys nothing. */
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={stream.posterUrl}
           alt=""

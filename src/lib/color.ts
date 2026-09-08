@@ -14,8 +14,24 @@ import sharp from "sharp";
  * This only ever drives the decorative ambient wash — never a data mark.
  */
 
-const CACHE_MAX = 100;
-const cache = new Map<string, string>();
+/**
+ * Negative results are cached too (as null).
+ *
+ * Without that, a poster that can't be fetched or has no usable color would
+ * re-run the download AND the sharp decode on every single activity poll —
+ * every 2 seconds, forever, for a decorative background tint.
+ */
+const CACHE_MAX = 200;
+const cache = new Map<string, string | null>();
+
+function remember(key: string, value: string | null): string | null {
+  if (cache.size >= CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, value);
+  return value;
+}
 
 /** Accent band: vivid enough to register, never so bright it competes. */
 const MIN_SATURATION = 0.45;
@@ -75,15 +91,14 @@ function toHex(r: number, g: number, b: number): string {
 }
 
 export async function extractAccentColor(imageUrl: string, cacheKey: string): Promise<string | null> {
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
+  if (cache.has(cacheKey)) return cache.get(cacheKey) ?? null;
 
   try {
     const response = await fetch(imageUrl, {
       signal: AbortSignal.timeout(6000),
       cache: "no-store",
     });
-    if (!response.ok) return null;
+    if (!response.ok) return remember(cacheKey, null);
 
     const buffer = Buffer.from(await response.arrayBuffer());
 
@@ -123,7 +138,7 @@ export async function extractAccentColor(imageUrl: string, cacheKey: string): Pr
 
     // A poster with nothing colorful in it (black-and-white, heavy grade)
     // gets no accent rather than a made-up one.
-    if (weightSum < 0.5) return null;
+    if (weightSum < 0.5) return remember(cacheKey, null);
 
     let hue = Math.atan2(sinSum / weightSum, cosSum / weightSum) / (Math.PI * 2);
     if (hue < 0) hue += 1;
@@ -132,18 +147,11 @@ export async function extractAccentColor(imageUrl: string, cacheKey: string): Pr
     const lightness = Math.min(Math.max(lightSum / weightSum, MIN_LIGHTNESS), MAX_LIGHTNESS);
 
     const [r, g, b] = hslToRgb(hue, saturation, lightness);
-    const hex = toHex(r, g, b);
-
-    if (cache.size >= CACHE_MAX) {
-      const oldest = cache.keys().next().value;
-      if (oldest) cache.delete(oldest);
-    }
-    cache.set(cacheKey, hex);
-
-    return hex;
+    return remember(cacheKey, toHex(r, g, b));
   } catch {
-    // An accent color is pure decoration — never let it break the page.
-    return null;
+    // An accent color is pure decoration — never let it break the page, and
+    // never let a failing poster cost a fetch every poll.
+    return remember(cacheKey, null);
   }
 }
 
