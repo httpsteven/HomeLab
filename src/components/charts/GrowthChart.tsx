@@ -21,13 +21,14 @@ import type { HistorySnapshot } from "@/lib/types";
  * stacked area. Two series, so a legend is required; both are also direct-
  * labelled at the right edge so identity never rests on color alone.
  *
- * Colors are categorical slots 1 and 2 (blue, orange) — validated adjacent
- * on this surface. One y-axis, always: no dual-axis.
+ * Colours are the validated two-series pair (red + teal). Red + amber was
+ * the on-brand first choice and it fails: CVD ΔE 4.5, normal-vision ΔE 14.5.
+ * One y-axis, always: no dual-axis.
  */
 
 const SERIES = [
-  { key: "movies", label: "Movies", color: "var(--series-1)" },
-  { key: "series", label: "Series", color: "var(--series-2)" },
+  { key: "movies", label: "Movies", color: "var(--pair-a)" },
+  { key: "series", label: "Series", color: "var(--pair-b)" },
 ] as const;
 
 interface Point {
@@ -51,7 +52,7 @@ function ChartTooltip({
   const total = payload.reduce((sum, entry) => sum + (entry.value ?? 0), 0);
 
   return (
-    <div className="rounded-lg border border-[var(--glass-border-strong)] bg-[rgba(18,20,26,0.97)] px-3 py-2 shadow-[var(--elev-3)]">
+    <div className="rounded-lg border border-[var(--glass-border-strong)] bg-[rgba(24,24,27,0.97)] px-3 py-2 shadow-[var(--elev-3)]">
       <p className="metric mb-1.5 text-[11px] text-ink-muted">{formatDate(label)}</p>
       {payload.map((entry) => {
         const meta = SERIES.find((series) => series.key === entry.dataKey);

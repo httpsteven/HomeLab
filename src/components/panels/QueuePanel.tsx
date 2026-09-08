@@ -76,9 +76,14 @@ export function QueuePanel({ limit = 5 }: { limit?: number }) {
                     className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700"
                     style={{
                       width: `${Math.max(item.progress * 100, 1)}%`,
+                      // Graphite, not the brand red. This list mixes healthy
+                      // rows with failed ones, so a red bar sitting beside a
+                      // "Stalled" row would read as an error state itself.
+                      // Brand red is only used for progress where no status
+                      // encoding shares the component.
                       background: item.hasError
                         ? "var(--status-serious)"
-                        : "var(--seq-400)",
+                        : "var(--meter-fill)",
                     }}
                   />
                 </div>

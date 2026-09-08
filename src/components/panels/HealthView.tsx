@@ -50,7 +50,7 @@ function CoreGrid({ cores }: { cores: number[] }) {
                         ? "var(--status-critical)"
                         : clamped >= 70
                           ? "var(--status-warning)"
-                          : "var(--seq-400)",
+                          : "var(--meter-fill)",
                   }}
                 />
               </div>
@@ -168,7 +168,7 @@ function MachinePanels() {
                         ? "var(--status-critical)"
                         : machine.memory.percent >= 80
                           ? "var(--status-warning)"
-                          : "var(--seq-400)",
+                          : "var(--meter-fill)",
                   }}
                 />
               </div>
@@ -217,7 +217,7 @@ function MachinePanels() {
                               ? "var(--status-critical)"
                               : fraction >= 0.75
                                 ? "var(--status-warning)"
-                                : "var(--seq-400)",
+                                : "var(--meter-fill)",
                         }}
                       />
                     </div>

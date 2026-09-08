@@ -17,11 +17,12 @@
   color-scheme: dark;
 
   /* --- Planes & surfaces -------------------------------------------------
-     Validated against these exact surfaces with the dataviz validator. */
-  --plane: #08090b;           /* page background */
-  --surface-1: #12141a;       /* chart / data surface (validator surface) */
-  --surface-2: #16181f;       /* raised data surface inside glass */
-  --surface-3: #1c1f27;       /* hover / active */
+     Neutral charcoal — no blue cast, so the red accent reads as the only
+     colour in the chrome. Validated against these exact surfaces. */
+  --plane: #0b0b0c;           /* page background */
+  --surface-1: #141416;       /* chart / data surface (validator surface) */
+  --surface-2: #18181b;       /* raised data surface inside glass */
+  --surface-3: #212124;       /* hover / active */
 
   /* --- Glass -------------------------------------------------------------
      Low intensity on purpose. The failure mode of this style is mush. */
@@ -39,13 +40,13 @@
      graphic floor — unusable for the 10-11px metadata it carries. Muted was
      lightened alongside it to keep four distinguishable levels. */
   --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
+  --text-secondary: #c9c7c2;
   --text-muted: #9d9c95;
   --text-faint: #82817b;
 
   /* --- Chart chrome ------------------------------------------------------- */
-  --gridline: #23252c;
-  --axis: #33363f;
+  --gridline: #26262a;
+  --axis: #36363c;
 
   /* --- Categorical palette (dark steps) ----------------------------------
      Fixed slot order — assigned in order, NEVER cycled. Validated on
@@ -61,15 +62,27 @@
   --series-7: #9085e9;  /* violet */
   --series-8: #e66767;  /* red */
 
-  /* --- Sequential ramp (blue, light→dark) --------------------------------
-     For continuous magnitude only — capacity heat, density. */
-  --seq-100: #cde2fb;
-  --seq-200: #9ec5f4;
-  --seq-300: #6da7ec;
-  --seq-400: #3987e5;
-  --seq-500: #256abf;
-  --seq-600: #184f95;
-  --seq-700: #0d366b;
+  /* --- Meter fill: graphite ----------------------------------------------
+     The "nothing to worry about" state for any gauge that ESCALATES —
+     capacity, CPU, memory, temperature.
+     
+     Deliberately colourless. These meters run graphite → amber → red, so a
+     disk at 20% recedes and only a real problem pulls the eye. The previous
+     blue made a perfectly healthy disk glow as brightly as a full one, which
+     is exactly backwards. Measured 3.9:1 against the track, clearing the 3:1
+     graphic floor. */
+  --meter-fill: #7c7c87;
+  --meter-fill-dim: #5a5a63;
+
+  /* --- Two-series pair (validated) ---------------------------------------
+     For the recurring movies-vs-series split: growth chart, library
+     composition, the Film/TV badges.
+
+     Red + teal, NOT red + amber. The warm pair is the obvious choice for this
+     identity and it fails hard — CVD ΔE 4.5 and normal-vision ΔE 14.5, below
+     even the full-colour-vision floor. This pair measures 8.3 / 30.2. */
+  --pair-a: #ef5350;   /* movies */
+  --pair-b: #199e70;   /* series */
 
   /* --- Status (reserved — never reused as a series color) -----------------
      These deliberately fail the categorical gates; every use ships with an
@@ -94,10 +107,24 @@
      colour identity stay put while the label stays readable. */
   --status-critical-text: #e66767;
 
-  /* --- Ambient accent (dynamic, decorative only) --------------------------
-     Overwritten at runtime from the now-playing poster. Neutral when idle. */
-  --accent: #3987e5;
-  --accent-glow: rgba(57, 135, 229, 0.18);
+  /* --- Brand accent: red --------------------------------------------------
+     CHROME ONLY — nav, focus rings, links, the logo, progress, the ambient
+     wash. It never appears inside a status-bearing data mark, which is what
+     lets red keep its "critical" meaning in the data layer: a red bar is
+     always an alarm, because brand red is never drawn as one.
+
+     Measured 5.1:1 on surface-2, so it is safe as link text.
+
+     FIXED. The poster-derived colour drives --ambient-glow ONLY, never this.
+     Letting a poster repaint the accent meant the nav, focus rings and every
+     progress bar changed colour with whatever was playing — the identity
+     disappeared the moment someone started a teal-heavy film. The ambient
+     wash still responds; the brand does not. */
+  --accent: #ef5350;
+  --accent-deep: #c9313c;
+
+  /* Poster-derived, decorative, and confined to the background wash. */
+  --ambient-glow: rgba(239, 83, 80, 0.16);
 
   /* --- Elevation — ONE light source, from above --------------------------- */
   --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -169,9 +196,9 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* The ambient wash. Sits behind everything, driven by --accent-glow, which
-   the now-playing poster updates. Idle = near-invisible, so the dashboard
-   visibly *rests* when nothing is streaming. */
+/* The ambient wash. Sits behind everything, driven by --ambient-glow, which
+   the now-playing poster updates. Idle = the brand red at low intensity, so
+   the dashboard visibly *rests* when nothing is streaming. */
 .ambient-wash {
   position: fixed;
   inset: 0;
@@ -180,7 +207,7 @@ body {
   background:
     radial-gradient(
       70% 55% at 50% -10%,
-      var(--accent-glow) 0%,
+      var(--ambient-glow) 0%,
       transparent 70%
     );
   transition: background 1200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -214,7 +241,7 @@ body {
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2c3038;
+  background: #303035;
   background-clip: padding-box;
 }
 
@@ -291,8 +318,8 @@ body {
 .is-live {
   box-shadow:
     var(--elev-2),
-    0 0 0 1px rgba(57, 135, 229, 0.25),
-    0 0 32px -8px var(--accent-glow);
+    0 0 0 1px rgba(239, 83, 80, 0.22),
+    0 0 32px -8px var(--ambient-glow);
 }
 
 @keyframes pulse-dot {

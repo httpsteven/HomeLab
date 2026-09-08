@@ -94,10 +94,10 @@ export function ActionButton({
           "after:absolute after:inset-0 after:-m-2 after:content-[''] sm:after:hidden",
           sizing,
           awaitingConfirm
-            ? "bg-[var(--status-critical-dim)] text-[var(--status-critical)]"
+            ? "bg-[var(--status-critical-dim)] text-[var(--status-critical-text)]"
             : variant === "danger"
               ? "bg-surface-3 text-[var(--status-serious)] hover:bg-[var(--status-serious-dim)]"
-              : "bg-surface-3 text-ink-secondary hover:bg-[#2a2e38] hover:text-ink",
+              : "bg-surface-3 text-ink-secondary hover:bg-[#2b2b30] hover:text-ink",
           state === "loading" && "cursor-wait opacity-70",
           className,
         )}

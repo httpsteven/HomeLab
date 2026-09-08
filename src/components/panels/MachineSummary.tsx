@@ -36,7 +36,7 @@ function Gauge({
       ? "var(--status-critical)"
       : clamped >= 75
         ? "var(--status-warning)"
-        : "var(--seq-400)";
+        : "var(--meter-fill)";
 
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-surface-2 p-3">

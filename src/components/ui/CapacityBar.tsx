@@ -38,7 +38,7 @@ export function CapacityBar({
       ? "var(--status-critical)"
       : level === "warning"
         ? "var(--status-warning)"
-        : "var(--seq-400)";
+        : "var(--meter-fill)";
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>

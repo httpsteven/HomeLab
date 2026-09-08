@@ -151,9 +151,9 @@ export function LargestItems({ items, limit = 40 }: { items: LargestItem[]; limi
                       style={{
                         background:
                           item.kind === "movie"
-                            ? "rgba(57,135,229,0.16)"
-                            : "rgba(217,89,38,0.16)",
-                        color: item.kind === "movie" ? "var(--series-1)" : "var(--series-2)",
+                            ? "rgba(239,83,80,0.16)"
+                            : "rgba(25,158,112,0.18)",
+                        color: item.kind === "movie" ? "var(--pair-a)" : "var(--pair-b)",
                       }}
                     >
                       {item.kind === "movie" ? "Film" : "TV"}

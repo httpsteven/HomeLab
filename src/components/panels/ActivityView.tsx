@@ -80,7 +80,7 @@ function PlaysChart({ data }: { data: WatchHistoryResponse["playsByDate"] }) {
             <Tooltip
               cursor={{ fill: "rgba(255,255,255,0.04)" }}
               contentStyle={{
-                background: "rgba(18,20,26,0.97)",
+                background: "rgba(24,24,27,0.97)",
                 border: "1px solid var(--glass-border-strong)",
                 borderRadius: 8,
                 fontSize: 12,
@@ -142,7 +142,7 @@ function RankedList({
                     className="h-full rounded-full"
                     style={{
                       width: `${(row.value / max) * 100}%`,
-                      background: "var(--seq-400)",
+                      background: "var(--accent)",
                     }}
                   />
                 </div>

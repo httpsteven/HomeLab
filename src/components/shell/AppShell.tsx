@@ -30,12 +30,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative z-10 flex min-h-dvh flex-col">
       {/* --- Top bar. On mobile this holds only identity + connection state;
               navigation moves to the bottom bar where thumbs are. --- */}
-      <header className="sticky top-0 z-30 border-b border-[var(--glass-border)] bg-[rgba(8,9,11,0.72)] backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--glass-border)] bg-[rgba(11,11,12,0.72)] backdrop-blur-xl">
         <div className="mx-auto flex h-14 w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6">
           <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Home lab dashboard, overview">
             <span
               className="grid size-7 place-items-center rounded-lg text-[13px] font-bold text-white"
-              style={{ background: "linear-gradient(140deg, var(--accent), var(--seq-600))" }}
+              style={{
+                background: "linear-gradient(140deg, var(--accent), var(--accent-deep))",
+              }}
               aria-hidden
             >
               L
@@ -92,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* --- Mobile bottom nav. 44px+ touch targets, safe-area aware. --- */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--glass-border)] bg-[rgba(8,9,11,0.9)] backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--glass-border)] bg-[rgba(11,11,12,0.9)] backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-stretch justify-around">

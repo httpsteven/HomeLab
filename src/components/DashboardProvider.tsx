@@ -111,20 +111,21 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /* --- Ambient accent -------------------------------------------------
-     The signature move: the page takes on the color of whatever is playing,
-     and returns to neutral when nothing is. Decorative only — data marks
-     never use this. */
+  /* --- Ambient wash ----------------------------------------------------
+     The signature move: the page takes on the colour of whatever is playing,
+     and returns to the brand red when nothing is.
+
+     Only the background wash changes. The brand accent stays fixed — a poster
+     repainting the nav, focus rings and progress bars would erase the
+     identity every time someone pressed play. Data marks never use either. */
   const accent = state?.activity.data?.accent ?? null;
   useEffect(() => {
     const root = document.documentElement;
     if (accent) {
       const triplet = hexToRgbTripletClient(accent);
-      root.style.setProperty("--accent", accent);
-      if (triplet) root.style.setProperty("--accent-glow", `rgba(${triplet}, 0.20)`);
+      if (triplet) root.style.setProperty("--ambient-glow", `rgba(${triplet}, 0.20)`);
     } else {
-      root.style.removeProperty("--accent");
-      root.style.removeProperty("--accent-glow");
+      root.style.removeProperty("--ambient-glow");
     }
   }, [accent]);
 

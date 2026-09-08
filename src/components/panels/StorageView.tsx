@@ -115,14 +115,14 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
                   <p className="label-muted">Library composition</p>
                   <StackedBar
                     segments={[
-                      { label: "Movies", value: libraryBytes.movies, color: "var(--series-1)" },
-                      { label: "Series", value: libraryBytes.series, color: "var(--series-2)" },
+                      { label: "Movies", value: libraryBytes.movies, color: "var(--pair-a)" },
+                      { label: "Series", value: libraryBytes.series, color: "var(--pair-b)" },
                     ]}
                   />
                   <div className="flex flex-col gap-1">
                     {[
-                      { label: "Movies", value: libraryBytes.movies, color: "var(--series-1)" },
-                      { label: "Series", value: libraryBytes.series, color: "var(--series-2)" },
+                      { label: "Movies", value: libraryBytes.movies, color: "var(--pair-a)" },
+                      { label: "Series", value: libraryBytes.series, color: "var(--pair-b)" },
                     ].map((segment) => (
                       <div key={segment.label} className="flex items-center gap-2 text-xs">
                         <span

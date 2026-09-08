@@ -285,8 +285,8 @@ function ItemTable({ items }: { items: LibraryItem[] }) {
                       className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase"
                       style={{
                         background:
-                          item.kind === "movie" ? "rgba(57,135,229,0.16)" : "rgba(217,89,38,0.16)",
-                        color: item.kind === "movie" ? "var(--series-1)" : "var(--series-2)",
+                          item.kind === "movie" ? "rgba(239,83,80,0.16)" : "rgba(25,158,112,0.18)",
+                        color: item.kind === "movie" ? "var(--pair-a)" : "var(--pair-b)",
                       }}
                     >
                       {item.kind === "movie" ? "Film" : "TV"}
