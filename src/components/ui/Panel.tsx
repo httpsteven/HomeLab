@@ -12,21 +12,30 @@ import { cn } from "@/lib/cn";
 
 export type PanelSpan = "sm" | "md" | "lg" | "xl" | "full";
 
-const SPAN_CLASSES: Record<PanelSpan, string> = {
-  // Mobile is always single-column; spans only take effect from `sm` up.
-  sm: "col-span-full sm:col-span-6 xl:col-span-3",
-  md: "col-span-full sm:col-span-6 xl:col-span-4",
-  lg: "col-span-full xl:col-span-6",
-  xl: "col-span-full xl:col-span-8",
-  full: "col-span-full",
-};
-
 /**
- * Tiles change size with state, which means row widths don't reliably sum to
- * 12 — an "all clear" health tile shrinking to 3 columns would otherwise
- * leave a 3-column hole. Dense auto-flow lets a later small tile backfill
- * that gap, so the grid stays packed while sizes still follow importance.
+ * Span is a size PREFERENCE, not a fixed column count.
+ *
+ * A rigid 12-column grid can't tile tiles whose spans change with state: an
+ * "all clear" health tile shrinking from 6 columns to 3 leaves a hole that
+ * nothing else fits into, and dense packing can only fill it if some later
+ * tile happens to be exactly the right width. The result is ragged rows with
+ * dead space on the right.
+ *
+ * So the grid is flex-wrap instead. Each tile declares a preferred width as a
+ * flex-basis and is allowed to grow: whatever slack is left on a row gets
+ * distributed across the tiles in it, so every row reaches the right edge no
+ * matter which combination of sizes lands there. Relative importance still
+ * shows, because a tile that prefers 760px stays visibly wider than one that
+ * prefers 360px.
  */
+const SPAN_CLASSES: Record<PanelSpan, string> = {
+  // Mobile is a single column; the basis only takes effect from `sm` up.
+  sm: "basis-full sm:basis-[260px]",
+  md: "basis-full sm:basis-[360px]",
+  lg: "basis-full sm:basis-[540px]",
+  xl: "basis-full sm:basis-[780px]",
+  full: "basis-full",
+};
 
 interface PanelProps {
   children: ReactNode;
@@ -42,7 +51,9 @@ export function Panel({ children, className, span = "md", live = false, as = "se
   return (
     <Component
       className={cn(
-        "glass flex flex-col overflow-hidden",
+        // min-w-0 matters: without it a long unbroken string (a release name)
+        // sets the flex base size and blows the tile past its share.
+        "glass flex min-w-0 grow flex-col overflow-hidden",
         SPAN_CLASSES[span],
         live && "is-live",
         className,
@@ -87,7 +98,10 @@ export function BentoGrid({ children, className }: { children: ReactNode; classN
   return (
     <div
       className={cn(
-        "grid grid-cols-1 gap-3 sm:grid-cols-12 sm:gap-4 sm:[grid-auto-flow:row_dense]",
+        // items-start stops a tall tile from stretching its neighbours into
+        // hundreds of pixels of dead space — an 11-warning health list was
+        // doing exactly that to the capacity tile beside it.
+        "flex flex-wrap items-start gap-3 sm:gap-4",
         className,
       )}
     >

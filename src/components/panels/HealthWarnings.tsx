@@ -37,7 +37,10 @@ export function HealthWarnings() {
             <p className="text-xs text-ink-faint">No warnings reported.</p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
+          // A fresh Sonarr with no indexers configured reports a dozen
+          // warnings; at full height that tile alone was taller than the rest
+          // of the page. Scrolls past six or so instead of dictating layout.
+          <ul className="flex max-h-[19rem] flex-col gap-2 overflow-y-auto pr-1">
             {unreachable.map((service) => (
               <li
                 key={`down-${service.id}`}

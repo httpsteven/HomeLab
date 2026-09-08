@@ -17,7 +17,12 @@ import { formatBytes, shortenPath } from "@/lib/format";
 export function CapacitySummary({ limit = 4 }: { limit?: number }) {
   const slot = useSlot("storage");
   const storage = slot.data;
-  const mounts = [...(storage?.mounts ?? [])].sort((a, b) => b.usedFraction - a.usedFraction);
+
+  // Pool members are excluded here too, or the summary contradicts the totals
+  // beside it — showing srv1/srv2/srv3 AND the pool that spans them.
+  const mounts = [...(storage?.mounts ?? [])]
+    .filter((mount) => !mount.partOfPool)
+    .sort((a, b) => b.usedFraction - a.usedFraction);
   const shown = mounts.slice(0, limit);
 
   // A mount over 90% promotes this tile to a wider cell.
@@ -73,7 +78,7 @@ export function TotalCapacity() {
   const fraction = totals && totals.capacity > 0 ? totals.used / totals.capacity : 0;
 
   return (
-    <Panel span="sm">
+    <Panel span="md">
       <PanelHeader title="Total storage" />
       <PanelBody className="flex flex-col justify-center gap-3">
         {slot.status === "not-configured" ? (

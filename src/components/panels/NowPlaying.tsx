@@ -122,6 +122,8 @@ export function NowPlaying() {
   const hasStreams = streams.length > 0;
 
   // Tile size follows importance: idle is small, busy takes the room it needs.
+  // Idle sits at 4 columns so it rows up with Total storage and Server (4+4+4);
+  // one or two streams take 8 and pair with Total storage.
   const span = !hasStreams ? "md" : streams.length > 2 ? "full" : "xl";
 
   return (

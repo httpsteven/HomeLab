@@ -39,13 +39,15 @@ export function ServiceStatusRow() {
   ).length;
 
   return (
-    <Panel span="full">
+    // 8 columns, not 12 — it pairs with the queue tile to complete the last
+    // row instead of each of them stranding space beside it.
+    <Panel span="xl">
       <PanelHeader
         title="Services"
         meta={problems > 0 ? `${problems} need attention` : "all healthy"}
       />
       <PanelBody>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
           {services.map((service) => {
             const level = levelFor(service);
             return (

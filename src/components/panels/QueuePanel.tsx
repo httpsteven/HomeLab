@@ -20,8 +20,12 @@ export function QueuePanel({ limit = 5 }: { limit?: number }) {
   const items = queue?.items.slice(0, limit) ?? [];
   const failed = queue?.counts.failed ?? 0;
 
+  // Nothing queued is the common case and needs almost no room; failures need
+  // the most, because that is the only reason anyone opens this panel.
+  const span = failed > 0 ? "xl" : items.length === 0 ? "md" : "lg";
+
   return (
-    <Panel span={failed > 0 ? "xl" : "lg"}>
+    <Panel span={span}>
       <PanelHeader
         title="Download queue"
         meta={queue ? `${queue.counts.total}` : undefined}
