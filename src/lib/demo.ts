@@ -7,6 +7,7 @@ import type {
   MachineState,
   QueueState,
   ServicesState,
+  MountView,
   StorageState,
   SubtitleState,
 } from "./types";
@@ -233,34 +234,94 @@ export function demoLibraryItems(): LibraryItem[] {
 
 export function demoStorage(library: LibraryState): StorageState {
   const full = demoLibraryFull();
+
   // Disk usage is derived from library size (plus ~6% for artwork, subtitles
   // and stray files) so the numbers agree with each other the way they would
-  // on a real server. Hardcoding both would let them drift apart and make the
-  // dashboard look wrong when it isn't.
-  const movieUsed = library.movies.bytes * 1.06;
-  const seriesUsed = library.series.bytes * 1.06;
+  // on a real server.
+  const mediaUsed = (library.movies.bytes + library.series.bytes) * 1.06;
 
-  const mounts = [
-    { path: "/mnt/media/movies", label: "movies", total: 34 * TB, used: movieUsed, fsType: "ext4", device: "/dev/sdb1" },
-    { path: "/mnt/media/tv", label: "tv", total: 22 * TB, used: seriesUsed, fsType: "ext4", device: "/dev/sdc1" },
-    { path: "/mnt/downloads", label: "downloads", total: 2 * TB, used: 0.42 * TB, fsType: "ext4", device: "/dev/sdd1" },
-    { path: "/", label: "root", total: 460 * GB, used: 128 * GB, fsType: "ext4", device: "/dev/sda2" },
-  ].map((mount) => ({
-    ...mount,
-    free: mount.total - mount.used,
-    usedFraction: mount.used / mount.total,
-    sources: ["sonarr", "radarr", "glances"] as StorageState["mounts"][number]["sources"],
-    fromMachine: true,
-  }));
+  /* A mergerfs pool over three drives — the shape that was double-counting.
+     The pool's capacity is the SUM of its branches, and the branches are
+     mounted individually too, so a naive aggregation reports twice the
+     storage that exists. */
+  // Sized off the library so the fixture stays internally coherent: a 44 TB
+  // library cannot sit in an 11 TB pool. Targets roughly 78% full overall.
+  const poolCapacity = mediaUsed / 0.78;
+  const branches = [
+    { path: "/mnt/srv1", label: "srv1", total: poolCapacity * 0.18, device: "/dev/sdb1" },
+    { path: "/mnt/srv2", label: "srv2", total: poolCapacity * 0.34, device: "/dev/sdd1" },
+    { path: "/mnt/srv3", label: "srv3", total: poolCapacity * 0.48, device: "/dev/sdc2" },
+  ];
+  const poolTotal = branches.reduce((sum, branch) => sum + branch.total, 0);
 
-  const totals = mounts.reduce(
-    (acc, mount) => ({
-      capacity: acc.capacity + mount.total,
-      used: acc.used + mount.used,
-      free: acc.free + mount.free,
-    }),
-    { capacity: 0, used: 0, free: 0 },
-  );
+  const members = branches.map((branch) => {
+    // Spread usage across branches proportionally, then skew the first one so
+    // a single near-full drive inside a healthy pool is visible.
+    const share = branch.total / poolTotal;
+    const used = Math.min(mediaUsed * share * (branch.path === "/mnt/srv1" ? 1.9 : 0.92), branch.total * 0.97);
+    return {
+      path: branch.path,
+      label: branch.label,
+      total: branch.total,
+      used,
+      free: branch.total - used,
+      usedFraction: used / branch.total,
+      sources: ["glances"] as MountView["sources"],
+      fromMachine: true,
+      fsType: "ext4",
+      device: branch.device,
+      isPool: false,
+      partOfPool: "/srv",
+    } satisfies MountView;
+  });
+
+  const poolUsed = members.reduce((sum, member) => sum + member.used, 0);
+
+  const rootTotal = 195.8 * GB;
+  const rootUsed = 51.1 * GB;
+
+  const mounts: MountView[] = [
+    {
+      path: "/srv",
+      label: "srv",
+      total: poolTotal,
+      used: poolUsed,
+      free: poolTotal - poolUsed,
+      usedFraction: poolUsed / poolTotal,
+      sources: ["sonarr", "radarr", "glances"],
+      fromMachine: true,
+      fsType: "fuse.mergerfs",
+      device: branches.map((branch) => branch.path).join(":"),
+      isPool: true,
+      poolMembers: branches.map((branch) => branch.path),
+    },
+    ...members,
+    {
+      path: "/",
+      label: "root",
+      total: rootTotal,
+      used: rootUsed,
+      free: rootTotal - rootUsed,
+      usedFraction: rootUsed / rootTotal,
+      sources: ["glances"],
+      fromMachine: true,
+      fsType: "ext4",
+      device: "/dev/mapper/ubuntu--vg-ubuntu--lv",
+      isPool: false,
+    },
+  ];
+
+  // Pool members are excluded, exactly as the real aggregator does.
+  const totals = mounts
+    .filter((mount) => !mount.partOfPool)
+    .reduce(
+      (acc, mount) => ({
+        capacity: acc.capacity + mount.total,
+        used: acc.used + mount.used,
+        free: acc.free + mount.free,
+      }),
+      { capacity: 0, used: 0, free: 0 },
+    );
 
   const largest = full.items
     .filter((item) => item.size > 0)
@@ -530,10 +591,8 @@ export function demoHistory(): HistorySnapshot[] {
       libraryBytes: { movies: movieBytes, series: seriesBytes, total: movieBytes + seriesBytes },
       counts: { movies: movieCount, series: 96, episodes: episodeCount },
       mounts: [
-        { path: "/mnt/media/movies", total: 34 * TB, used: movieBytes * 1.06 },
-        { path: "/mnt/media/tv", total: 22 * TB, used: seriesBytes * 1.06 },
-        { path: "/mnt/downloads", total: 2 * TB, used: (0.3 + random() * 0.25) * TB },
-        { path: "/", total: 460 * GB, used: 128 * GB },
+        { path: "/srv", total: 57.5 * TB, used: (movieBytes + seriesBytes) * 1.06 },
+        { path: "/", total: 195.8 * GB, used: 51.1 * GB },
       ],
     });
   }

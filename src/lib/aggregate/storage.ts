@@ -9,10 +9,16 @@ import { getMovies, getSeries } from "./media-cache";
 /**
  * Storage aggregation — the centerpiece of the dashboard.
  *
- * The subtle part is deduplication. Sonarr and Radarr both report /mnt/media
- * if both store there, and Glances reports it again from the OS. Counting it
- * three times would inflate total capacity enormously, so mounts are keyed by
- * path and merged, recording which services saw each one.
+ * The whole difficulty here is counting each byte exactly once. The same
+ * physical filesystem reaches us through up to three different names:
+ *
+ *   1. Sonarr and Radarr both report /mnt/media if both store there.
+ *   2. Glances runs with the host root bind-mounted at /rootfs, so it reports
+ *      every filesystem a second time under that prefix.
+ *   3. A union filesystem (mergerfs) presents one pool whose capacity is the
+ *      SUM of member drives that are themselves separately mounted.
+ *
+ * Miss any of those and total capacity silently doubles.
  */
 
 /** Pseudo-filesystems that are not real storage and only add noise. */
@@ -34,15 +40,70 @@ const IGNORED_FS_TYPES = new Set([
 
 const IGNORED_PATH_PREFIXES = ["/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/docker"];
 
+/** Union filesystems: one pool spanning several real drives. */
+const UNION_FS_TYPES = ["mergerfs", "unionfs", "aufs", "mhddfs", "overlayfs"];
+
+/**
+ * Glances is normally run with `-v /:/rootfs:ro`, so it sees the host's
+ * filesystems under that prefix and reports e.g. /rootfs/mnt/srv1. That's the
+ * same disk Sonarr calls /mnt/srv1 — without stripping this, every drive is
+ * counted twice.
+ */
+function stripRootfsPrefix(path: string): string {
+  if (path === "/rootfs") return "/";
+  if (path.startsWith("/rootfs/")) return path.slice("/rootfs".length);
+  return path;
+}
+
 function isRealMount(path: string, fsType?: string): boolean {
   if (fsType && IGNORED_FS_TYPES.has(fsType.toLowerCase())) return false;
   return !IGNORED_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
+/**
+ * Servarr's `label` is whatever fstab used, which on Linux is usually a UUID
+ * or a /dev/disk/by-id path — unreadable as a heading. Fall back to the mount
+ * path in that case.
+ */
+function isDeviceishLabel(label: string): boolean {
+  return (
+    label.startsWith("/dev/") ||
+    label.startsWith("UUID=") ||
+    label.includes(":") ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(label) ||
+    label.length > 24
+  );
 }
 
 function labelForPath(path: string): string {
   if (path === "/") return "root";
   const segments = path.split("/").filter(Boolean);
   return segments[segments.length - 1] ?? path;
+}
+
+function cleanLabel(rawLabel: string | undefined, path: string): string {
+  const label = rawLabel?.trim();
+  if (!label || isDeviceishLabel(label)) return labelForPath(path);
+  return label;
+}
+
+/**
+ * A union mount advertises its branches in the device field, colon-joined:
+ * "/mnt/srv1:/mnt/srv2:/mnt/srv3". That's the signal we use — it also names
+ * exactly which mounts to exclude from the totals.
+ */
+function unionBranches(device: string | undefined, fsType: string | undefined): string[] | null {
+  const byType = fsType && UNION_FS_TYPES.some((type) => fsType.toLowerCase().includes(type));
+  const device_ = device?.trim();
+
+  if (!device_ || !device_.includes(":")) return byType ? [] : null;
+
+  const parts = device_.split(":").map((part) => part.trim()).filter(Boolean);
+  // Every branch is an absolute path — distinguishes a mergerfs device from
+  // something like an NFS "host:/export".
+  if (parts.length >= 2 && parts.every((part) => part.startsWith("/"))) return parts;
+
+  return byType ? [] : null;
 }
 
 export async function buildStorageState(): Promise<StorageState> {
@@ -55,16 +116,41 @@ export async function buildStorageState(): Promise<StorageState> {
   ]);
 
   const byPath = new Map<string, MountView>();
+  /** Device → canonical path, so the same device under two names merges. */
+  const byDevice = new Map<string, string>();
 
   const addMount = (
-    path: string,
+    rawPath: string,
     total: number,
     free: number,
     source: ServiceId,
     extra: { label?: string; fromMachine?: boolean; fsType?: string; device?: string } = {},
   ) => {
+    const path = stripRootfsPrefix(rawPath);
     if (!path || total <= 0) return;
     if (!isRealMount(path, extra.fsType)) return;
+
+    const device = extra.device?.trim();
+    const branches = unionBranches(device ?? extra.label, extra.fsType);
+    const isPool = branches !== null;
+
+    // A device seen under a second path is the same filesystem. Union mounts
+    // are exempt: their "device" is a branch list, not a block device, and
+    // several pools could legitimately share one.
+    if (device && !isPool) {
+      const existingPath = byDevice.get(device);
+      if (existingPath && existingPath !== path) {
+        const existing = byPath.get(existingPath);
+        if (existing) {
+          if (!existing.sources.includes(source)) existing.sources.push(source);
+          if (extra.fromMachine) {
+            existing.fsType = extra.fsType ?? existing.fsType;
+            existing.fromMachine = true;
+          }
+          return;
+        }
+      }
+    }
 
     const existing = byPath.get(path);
     if (existing) {
@@ -79,12 +165,18 @@ export async function buildStorageState(): Promise<StorageState> {
         existing.fsType = extra.fsType ?? existing.fsType;
         existing.device = extra.device ?? existing.device;
       }
+      if (isPool && branches && branches.length > 0) {
+        existing.isPool = true;
+        existing.poolMembers = branches;
+      }
       return;
     }
 
+    if (device && !isPool) byDevice.set(device, path);
+
     byPath.set(path, {
       path,
-      label: extra.label?.trim() || labelForPath(path),
+      label: cleanLabel(extra.label, path),
       total,
       free,
       used: total - free,
@@ -93,6 +185,8 @@ export async function buildStorageState(): Promise<StorageState> {
       fromMachine: extra.fromMachine ?? false,
       fsType: extra.fsType,
       device: extra.device,
+      isPool,
+      poolMembers: branches && branches.length > 0 ? branches : undefined,
     });
   };
 
@@ -116,9 +210,26 @@ export async function buildStorageState(): Promise<StorageState> {
     }
   }
 
-  const mounts = [...byPath.values()].sort((a, b) => b.total - a.total);
+  /* --- Mark pool members ------------------------------------------------
+     A mergerfs pool reports capacity equal to the sum of its branches. Those
+     branches are usually mounted individually too, so counting both tells you
+     you have twice the storage you actually have. Members stay visible — they
+     are the physical drives, and per-drive fullness matters — but they are
+     excluded from the totals. */
+  const mounts = [...byPath.values()];
+  for (const pool of mounts) {
+    if (!pool.isPool || !pool.poolMembers) continue;
+    for (const memberPath of pool.poolMembers) {
+      const member = byPath.get(stripRootfsPrefix(memberPath));
+      if (member && member.path !== pool.path) member.partOfPool = pool.path;
+    }
+  }
 
-  const totals = mounts.reduce(
+  const sorted = mounts.sort((a, b) => b.total - a.total);
+
+  // Only mounts that aren't inside a pool contribute to the totals.
+  const counted = sorted.filter((mount) => !mount.partOfPool);
+  const totals = counted.reduce(
     (acc, mount) => ({
       capacity: acc.capacity + mount.total,
       used: acc.used + mount.used,
@@ -177,7 +288,7 @@ export async function buildStorageState(): Promise<StorageState> {
     .slice(0, 250);
 
   return {
-    mounts,
+    mounts: sorted,
     totals,
     libraryBytes: {
       movies: movieBytes,

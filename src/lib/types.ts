@@ -93,6 +93,17 @@ export interface MountView {
   fromMachine: boolean;
   fsType?: string;
   device?: string;
+  /** True when this is a union filesystem spanning other mounts (mergerfs). */
+  isPool: boolean;
+  /** For a pool: the member mount paths it spans. */
+  poolMembers?: string[];
+  /**
+   * For a member: the pool that spans it.
+   *
+   * Members are excluded from capacity totals — a mergerfs pool and its
+   * branches report the same bytes, so counting both doubles the library.
+   */
+  partOfPool?: string;
 }
 
 export interface LargestItem {

@@ -36,7 +36,15 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
     );
   }
 
-  const mounts = [...(storage?.mounts ?? [])].sort((a, b) => b.usedFraction - a.usedFraction);
+  const allMounts = [...(storage?.mounts ?? [])].sort((a, b) => b.usedFraction - a.usedFraction);
+
+  // Pool members are nested under their pool rather than listed as peers —
+  // a mergerfs pool and its branches are the same bytes, and showing them
+  // side by side reads as far more storage than exists.
+  const mounts = allMounts.filter((mount) => !mount.partOfPool);
+  const membersOf = (poolPath: string) =>
+    allMounts.filter((mount) => mount.partOfPool === poolPath);
+
   const runway = storage ? projectRunway(history, mounts) : [];
   const runwayByPath = new Map(runway.map((entry) => [entry.path, entry]));
 
@@ -48,7 +56,13 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
       <Panel span="xl">
         <PanelHeader
           title="Mounts"
-          meta={mounts.length ? `${mounts.length}` : undefined}
+          meta={
+            mounts.length
+              ? allMounts.length > mounts.length
+                ? `${mounts.length} · ${allMounts.length - mounts.length} in pools`
+                : `${mounts.length}`
+              : undefined
+          }
           action={<Freshness fetchedAt={slot.fetchedAt} mode={slot.mode} />}
         />
         <PanelBody className="flex flex-col gap-5">
@@ -57,16 +71,40 @@ export function StorageView({ history }: { history: HistorySnapshot[] }) {
           ) : (
             mounts.map((mount) => {
               const projection = runwayByPath.get(mount.path);
+              const members = mount.isPool ? membersOf(mount.path) : [];
               return (
                 <div key={mount.path} className="flex flex-col gap-2">
                   <CapacityBar
                     label={mount.label}
-                    sublabel={`${shortenPath(mount.path, 3)}${
-                      mount.device ? ` · ${mount.device}` : ""
-                    }`}
+                    sublabel={
+                      mount.isPool
+                        ? `${shortenPath(mount.path, 3)} · pool of ${members.length || mount.poolMembers?.length || 0} drives`
+                        : `${shortenPath(mount.path, 3)}${mount.device ? ` · ${mount.device}` : ""}`
+                    }
                     used={mount.used}
                     total={mount.total}
                   />
+
+                  {/* The physical drives behind a pool. Shown because
+                      per-drive fullness still matters — mergerfs can fail a
+                      write when one branch fills even though the pool has
+                      room — but never added to the totals. */}
+                  {members.length > 0 ? (
+                    <div className="ml-3 flex flex-col gap-2.5 border-l border-[var(--glass-border)] pl-3">
+                      {members.map((member) => (
+                        <CapacityBar
+                          key={member.path}
+                          label={member.label}
+                          sublabel={`${shortenPath(member.path, 2)}${
+                            member.device ? ` · ${member.device}` : ""
+                          }`}
+                          used={member.used}
+                          total={member.total}
+                          compact
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                   {projection?.confident && projection.daysRemaining !== null ? (
                     <p className="metric text-[11px] text-ink-faint">
                       +{formatBytes(projection.bytesPerDay)}/day · full in{" "}
