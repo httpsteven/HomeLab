@@ -90,9 +90,9 @@ function connectPlex(): Connection {
       scheduleReconnect();
     });
 
-    socket.on("error", () => {
+    socket.on("error", (error: Error) => {
       // 'close' always follows; reconnect is handled there.
-      setPushMode("plex", "poll");
+      setPushMode("plex", "poll", error?.message ?? "websocket error");
     });
   };
 
@@ -190,8 +190,12 @@ async function connectArr(kind: "sonarr" | "radarr"): Promise<Connection> {
       refreshSoon("services", 500);
     });
 
-    connection.onreconnecting(() => setPushMode(kind, "poll"));
-    connection.onclose(() => setPushMode(kind, "poll"));
+    connection.onreconnecting((error) =>
+      setPushMode(kind, "poll", `reconnecting: ${error?.message ?? "connection lost"}`),
+    );
+    connection.onclose((error) =>
+      setPushMode(kind, "poll", `closed: ${error?.message ?? "connection ended"}`),
+    );
 
     await connection.start();
     if (stopped) {
@@ -207,9 +211,15 @@ async function connectArr(kind: "sonarr" | "radarr"): Promise<Connection> {
         setPushMode(kind, "idle");
       },
     };
-  } catch {
-    // Falls back to polling — which is already running.
-    setPushMode(kind, "poll");
+  } catch (error) {
+    // Falls back to polling — which is already running. The reason is recorded
+    // rather than swallowed, so /api/diag can say WHY push isn't active
+    // instead of just reporting that it isn't.
+    setPushMode(
+      kind,
+      "poll",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    );
     return { stop: () => {} };
   }
 }
@@ -240,8 +250,10 @@ async function connectBazarr(): Promise<Connection> {
     });
 
     socket.on("connect", () => setPushMode("bazarr", "push"));
-    socket.on("disconnect", () => setPushMode("bazarr", "poll"));
-    socket.on("connect_error", () => setPushMode("bazarr", "poll"));
+    socket.on("disconnect", (reason) => setPushMode("bazarr", "poll", `disconnected: ${reason}`));
+    socket.on("connect_error", (error) =>
+      setPushMode("bazarr", "poll", `connect_error: ${error?.message ?? "unknown"}`),
+    );
 
     // Bazarr emits a generic data event describing what changed.
     socket.on("data", (payload: { type?: string }) => {
@@ -257,8 +269,12 @@ async function connectBazarr(): Promise<Connection> {
         setPushMode("bazarr", "idle");
       },
     };
-  } catch {
-    setPushMode("bazarr", "poll");
+  } catch (error) {
+    setPushMode(
+      "bazarr",
+      "poll",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    );
     return { stop: () => {} };
   }
 }

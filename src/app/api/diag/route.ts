@@ -1,6 +1,6 @@
 import { allServices, isConfigured } from "@/lib/config";
 import { getState } from "@/lib/collect/store";
-import { allPushModes } from "@/lib/collect/push-state";
+import { allPushModes, allPushReasons } from "@/lib/collect/push-state";
 import { probeAllServices } from "@/lib/health-check";
 import { isDemoMode } from "@/lib/demo";
 import type { SlotKey } from "@/lib/types";
@@ -46,6 +46,8 @@ export async function GET() {
         .filter((service) => isConfigured(service))
         .map((service) => service.id),
       pushModes: allPushModes(),
+      // Why anything on "poll" isn't pushing.
+      pushFallbackReasons: allPushReasons(),
       slots,
       probes: probes.map((probe) => ({
         service: probe.id,

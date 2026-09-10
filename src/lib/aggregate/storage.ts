@@ -40,6 +40,22 @@ const IGNORED_FS_TYPES = new Set([
 
 const IGNORED_PATH_PREFIXES = ["/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/docker"];
 
+/**
+ * Individual FILES that Docker bind-mounts into a container.
+ *
+ * Glances running in a container sees these as separate "filesystems" and
+ * reports each with the size of the underlying disk — so /etc/hostname shows
+ * up as another 195 GB volume identical to root, inflating total capacity.
+ * They are not storage.
+ */
+const IGNORED_EXACT_PATHS = new Set([
+  "/etc/hostname",
+  "/etc/hosts",
+  "/etc/resolv.conf",
+  "/etc/localtime",
+  "/etc/timezone",
+]);
+
 /** Union filesystems: one pool spanning several real drives. */
 const UNION_FS_TYPES = ["mergerfs", "unionfs", "aufs", "mhddfs", "overlayfs"];
 
@@ -57,6 +73,7 @@ function stripRootfsPrefix(path: string): string {
 
 function isRealMount(path: string, fsType?: string): boolean {
   if (fsType && IGNORED_FS_TYPES.has(fsType.toLowerCase())) return false;
+  if (IGNORED_EXACT_PATHS.has(path)) return false;
   return !IGNORED_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
@@ -155,6 +172,11 @@ export async function buildStorageState(): Promise<StorageState> {
     const existing = byPath.get(path);
     if (existing) {
       if (!existing.sources.includes(source)) existing.sources.push(source);
+      // Register the device here as well as on creation. A mount first seen
+      // from Sonarr (which reports no device) would otherwise never enter the
+      // device index, so a later entry for the same device — Glances reporting
+      // a bind-mounted file, say — looked like a separate filesystem.
+      if (device && !isPool && !byDevice.has(device)) byDevice.set(device, path);
       // Glances reads the OS directly, so its numbers win on conflict.
       if (extra.fromMachine) {
         existing.total = total;

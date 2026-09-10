@@ -448,7 +448,6 @@ export function LibraryView() {
   // Plex and the *arr apps counting differently is a real signal (files Plex
   // hasn't scanned), so it's surfaced rather than reconciled away.
   const plexMovies = plexLibraries.find((entry) => entry.type === "movie");
-  const plexShows = plexLibraries.find((entry) => entry.type === "show");
   const movieDrift = plexMovies ? movies.withFile - plexMovies.count : null;
 
   return (
@@ -514,13 +513,22 @@ export function LibraryView() {
               {movieDrift !== null && Math.abs(movieDrift) > 0 ? (
                 <div className="mt-2">
                   <InfoNote>
-                    Radarr has {Math.abs(movieDrift)} {Math.abs(movieDrift) === 1 ? "film" : "films"}{" "}
-                    {movieDrift > 0 ? "more" : "fewer"} than Plex. Usually means Plex hasn&apos;t
-                    scanned recent imports yet — worth a library scan if it persists.
+                    {movieDrift > 0 ? (
+                      <>
+                        Radarr tracks {movieDrift} {movieDrift === 1 ? "film" : "films"} Plex
+                        hasn&apos;t got. Usually means Plex hasn&apos;t scanned recent imports —
+                        worth a library scan if it persists.
+                      </>
+                    ) : (
+                      <>
+                        Plex has {Math.abs(movieDrift)} {Math.abs(movieDrift) === 1 ? "film" : "films"}{" "}
+                        Radarr isn&apos;t tracking — added straight to Plex rather than through
+                        Radarr, so they won&apos;t get upgrades, renames or subtitle handling.
+                      </>
+                    )}
                   </InfoNote>
                 </div>
               ) : null}
-              {plexShows ? null : null}
             </div>
           ) : null}
         </PanelBody>

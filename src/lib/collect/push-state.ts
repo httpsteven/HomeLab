@@ -16,12 +16,29 @@ import type { SlotMode } from "@/lib/types";
 
 const globalForPush = globalThis as unknown as {
   __pushModes?: Map<ServiceId, SlotMode>;
+  __pushReasons?: Map<ServiceId, string>;
 };
 
 const modes: Map<ServiceId, SlotMode> = (globalForPush.__pushModes ??= new Map());
 
-export function setPushMode(id: ServiceId, mode: SlotMode): void {
+/**
+ * Why a source is on polling rather than push.
+ *
+ * The fallback used to be entirely silent: the UI reported "polling" and gave
+ * no way to find out whether the socket was refused, rejected, or never
+ * attempted. Reporting the mode without the reason makes a degraded state
+ * look like a designed one.
+ */
+const reasons: Map<ServiceId, string> = (globalForPush.__pushReasons ??= new Map());
+
+export function setPushMode(id: ServiceId, mode: SlotMode, reason?: string): void {
   modes.set(id, mode);
+  if (mode === "push") reasons.delete(id);
+  else if (reason) reasons.set(id, reason);
+}
+
+export function allPushReasons(): Record<string, string> {
+  return Object.fromEntries(reasons);
 }
 
 export function getPushMode(id: ServiceId): SlotMode {
