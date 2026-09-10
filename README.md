@@ -152,6 +152,35 @@ don't get machine-level stats.
 
 ---
 
+## Quietening irrelevant warnings
+
+Sonarr and Radarr report health checks that assume you acquire media through
+indexers and a download client. If you build your library another way — ripping
+discs, say — several of those are permanently true and permanently irrelevant,
+and a health panel that always shows five warnings is one you stop reading.
+
+```
+HEALTH_MUTE=download-automation
+```
+
+That covers the indexer, download-client and import-mechanism checks across
+both services. Muted checks are still **counted** in the panel ("2 muted"), so
+a rule you set months ago can't silently hide something you'd want to see.
+
+Deliberately not included in that group: `UpdateCheck`, because an available
+update is real information, and anything about the library itself such as
+`RemovedMovieCheck`. Mute those individually if you want them gone:
+
+```
+HEALTH_MUTE=download-automation,updates,radarr:RemovedMovieCheck
+```
+
+Matching is on the check's source — Servarr's stable check-class name — rather
+than its message, since messages carry version numbers and get reworded between
+releases.
+
+---
+
 ## Demo mode
 
 To see the dashboard populated before connecting anything:

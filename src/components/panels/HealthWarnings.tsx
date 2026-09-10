@@ -26,15 +26,30 @@ export function HealthWarnings() {
 
   const total = issues.length + unreachable.length;
 
+  // Suppressed checks are counted, never hidden outright. A mute rule you
+  // forgot about should be discoverable from the panel it's affecting.
+  const muted = services.reduce((sum, service) => sum + service.mutedIssues, 0);
+
   return (
     <Panel span={total > 0 ? "lg" : "sm"}>
-      <PanelHeader title="Health" meta={total > 0 ? `${total}` : undefined} />
+      <PanelHeader
+        title="Health"
+        meta={
+          [total > 0 ? `${total}` : null, muted > 0 ? `${muted} muted` : null]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
+      />
       <PanelBody>
         {total === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-4 text-center">
             <ShieldCheck size={20} style={{ color: "var(--status-good)" }} aria-hidden />
             <p className="text-sm font-medium text-ink">All clear</p>
-            <p className="text-xs text-ink-faint">No warnings reported.</p>
+            <p className="text-xs text-ink-faint">
+              {muted > 0
+                ? `No warnings reported. ${muted} muted by HEALTH_MUTE.`
+                : "No warnings reported."}
+            </p>
           </div>
         ) : (
           // A fresh Sonarr with no indexers configured reports a dozen

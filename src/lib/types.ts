@@ -221,6 +221,11 @@ export interface ServiceHealthView {
   error: string | null;
   /** The service's own health checks, where it publishes them. */
   issues: { level: "warning" | "critical" | "notice"; message: string; source: string }[];
+  /**
+   * Checks suppressed by HEALTH_MUTE. Reported rather than dropped, so a mute
+   * rule can never quietly hide something you'd have wanted to see.
+   */
+  mutedIssues: number;
   /** How this service's live data is arriving. */
   mode: SlotMode;
 }

@@ -482,22 +482,46 @@ export function demoMachine(): MachineState {
 }
 
 export function demoServices(): ServicesState {
+  const base = { configured: true, reachable: true, error: null, mutedIssues: 0 } as const;
   return {
     services: [
-      { id: "plex", label: "Plex", configured: true, reachable: true, version: "1.41.3.9314", responseMs: 12, error: null, issues: [], mode: "push" },
-      { id: "tautulli", label: "Tautulli", configured: true, reachable: true, version: "1.41.3.9314", responseMs: 24, error: null, issues: [], mode: "poll" },
+      { ...base, id: "plex", label: "Plex", version: "1.41.3.9314", responseMs: 12, issues: [], mode: "push" },
+      { ...base, id: "tautulli", label: "Tautulli", version: "1.41.3.9314", responseMs: 24, issues: [], mode: "poll" },
       {
-        id: "sonarr", label: "Sonarr", configured: true, reachable: true, version: "4.0.10.2544", responseMs: 18, error: null,
-        issues: [{ level: "warning", message: "Indexer 'NZBgeek' is unavailable due to failures for more than 6 hours", source: "IndexerStatusCheck" }],
+        ...base,
+        id: "sonarr",
+        label: "Sonarr",
+        version: "4.0.10.2544",
+        responseMs: 18,
+        issues: [
+          {
+            level: "warning",
+            message: "Indexer 'NZBgeek' is unavailable due to failures for more than 6 hours",
+            source: "IndexerStatusCheck",
+          },
+        ],
+        // Two download-automation checks suppressed by HEALTH_MUTE, so the
+        // "muted" affordance is visible in demo rather than only in the wild.
+        mutedIssues: 2,
         mode: "push",
       },
-      { id: "radarr", label: "Radarr", configured: true, reachable: true, version: "5.14.0.9383", responseMs: 21, error: null, issues: [], mode: "push" },
+      { ...base, id: "radarr", label: "Radarr", version: "5.14.0.9383", responseMs: 21, issues: [], mutedIssues: 2, mode: "push" },
       {
-        id: "bazarr", label: "Bazarr", configured: true, reachable: true, version: "1.4.5", responseMs: 33, error: null,
-        issues: [{ level: "warning", message: "Provider 'opensubtitles.com' reached its daily download limit", source: "Providers" }],
+        ...base,
+        id: "bazarr",
+        label: "Bazarr",
+        version: "1.4.5",
+        responseMs: 33,
+        issues: [
+          {
+            level: "warning",
+            message: "Provider 'opensubtitles.com' reached its daily download limit",
+            source: "Providers",
+          },
+        ],
         mode: "push",
       },
-      { id: "glances", label: "Glances", configured: true, reachable: true, version: "API v4", responseMs: 9, error: null, issues: [], mode: "poll" },
+      { ...base, id: "glances", label: "Glances", version: "API v4", responseMs: 9, issues: [], mode: "poll" },
     ],
   };
 }

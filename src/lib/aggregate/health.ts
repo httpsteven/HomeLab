@@ -15,6 +15,7 @@ import type {
   SubtitleState,
 } from "@/lib/types";
 import { getPushMode } from "@/lib/collect/push-state";
+import { healthMuteRules, isMuted, type MuteRule } from "@/lib/health-mute";
 
 /**
  * Service reachability + each tool's own health checks + queue + subtitles.
@@ -28,16 +29,30 @@ async function arrHealth(
   client: ArrClient,
   id: ServiceId,
   label: string,
+  muteRules: MuteRule[],
 ): Promise<ServiceHealthView> {
   const configured = isConfigured(client.config);
   if (!configured) {
     return {
       id, label, configured: false, reachable: false, version: null,
-      responseMs: null, error: null, issues: [], mode: "idle",
+      responseMs: null, error: null, issues: [], mutedIssues: 0, mode: "idle",
     };
   }
 
   const [status, health] = await Promise.all([client.systemStatus(), client.health()]);
+
+  const all =
+    health.ok && Array.isArray(health.data)
+      ? health.data
+          .filter((issue) => issue.type === "warning" || issue.type === "error")
+          .map((issue) => ({
+            level: issue.type === "error" ? ("critical" as const) : ("warning" as const),
+            message: issue.message,
+            source: issue.source,
+          }))
+      : [];
+
+  const issues = all.filter((issue) => !isMuted(muteRules, id, issue.source, issue.message));
 
   return {
     id,
@@ -47,32 +62,25 @@ async function arrHealth(
     version: status.ok ? (status.data?.version ?? null) : null,
     responseMs: status.durationMs,
     error: status.ok ? null : status.message,
-    issues:
-      health.ok && Array.isArray(health.data)
-        ? health.data
-            .filter((issue) => issue.type === "warning" || issue.type === "error")
-            .map((issue) => ({
-              level: issue.type === "error" ? ("critical" as const) : ("warning" as const),
-              message: issue.message,
-              source: issue.source,
-            }))
-        : [],
+    issues,
+    mutedIssues: all.length - issues.length,
     mode: getPushMode(id),
   };
 }
 
 export async function buildServicesState(): Promise<ServicesState> {
   const configs = new Map(allServices().map((service) => [service.id, service]));
+  const muteRules = healthMuteRules();
 
   const [sonarrHealth, radarrHealth, plexHealth, tautulliHealth, bazarrHealth, glancesHealth] =
     await Promise.all([
-      arrHealth(sonarr, "sonarr", "Sonarr"),
-      arrHealth(radarr, "radarr", "Radarr"),
+      arrHealth(sonarr, "sonarr", "Sonarr", muteRules),
+      arrHealth(radarr, "radarr", "Radarr", muteRules),
 
       (async (): Promise<ServiceHealthView> => {
         const config = configs.get("plex")!;
         if (!isConfigured(config)) {
-          return { id: "plex", label: "Plex", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mode: "idle" };
+          return { id: "plex", label: "Plex", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mutedIssues: 0, mode: "idle" };
         }
         const identity = await plex.identity();
         return {
@@ -84,6 +92,7 @@ export async function buildServicesState(): Promise<ServicesState> {
           responseMs: identity.durationMs,
           error: identity.ok ? null : identity.message,
           issues: [],
+          mutedIssues: 0,
           mode: getPushMode("plex"),
         };
       })(),
@@ -91,7 +100,7 @@ export async function buildServicesState(): Promise<ServicesState> {
       (async (): Promise<ServiceHealthView> => {
         const config = configs.get("tautulli")!;
         if (!isConfigured(config)) {
-          return { id: "tautulli", label: "Tautulli", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mode: "idle" };
+          return { id: "tautulli", label: "Tautulli", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mutedIssues: 0, mode: "idle" };
         }
         const info = await tautulli.serverInfo();
         return {
@@ -103,6 +112,7 @@ export async function buildServicesState(): Promise<ServicesState> {
           responseMs: info.durationMs,
           error: info.ok ? null : info.message,
           issues: [],
+          mutedIssues: 0,
           mode: "poll",
         };
       })(),
@@ -110,9 +120,17 @@ export async function buildServicesState(): Promise<ServicesState> {
       (async (): Promise<ServiceHealthView> => {
         const config = configs.get("bazarr")!;
         if (!isConfigured(config)) {
-          return { id: "bazarr", label: "Bazarr", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mode: "idle" };
+          return { id: "bazarr", label: "Bazarr", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mutedIssues: 0, mode: "idle" };
         }
         const [status, health] = await Promise.all([bazarr.status(), bazarr.health()]);
+        const bazarrIssues =
+          health.ok && Array.isArray(health.data?.data)
+            ? health.data.data.map((issue) => ({
+                level: "warning" as const,
+                message: issue.issue,
+                source: issue.object,
+              }))
+            : [];
         return {
           id: "bazarr",
           label: "Bazarr",
@@ -121,14 +139,12 @@ export async function buildServicesState(): Promise<ServicesState> {
           version: status.ok ? (status.data?.data?.bazarr_version ?? null) : null,
           responseMs: status.durationMs,
           error: status.ok ? null : status.message,
-          issues:
-            health.ok && Array.isArray(health.data?.data)
-              ? health.data.data.map((issue) => ({
-                  level: "warning" as const,
-                  message: issue.issue,
-                  source: issue.object,
-                }))
-              : [],
+          issues: bazarrIssues.filter(
+            (issue) => !isMuted(muteRules, "bazarr", issue.source, issue.message),
+          ),
+          mutedIssues: bazarrIssues.filter((issue) =>
+            isMuted(muteRules, "bazarr", issue.source, issue.message),
+          ).length,
           mode: getPushMode("bazarr"),
         };
       })(),
@@ -136,7 +152,7 @@ export async function buildServicesState(): Promise<ServicesState> {
       (async (): Promise<ServiceHealthView> => {
         const config = configs.get("glances")!;
         if (!isConfigured(config)) {
-          return { id: "glances", label: "Glances", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mode: "idle" };
+          return { id: "glances", label: "Glances", configured: false, reachable: false, version: null, responseMs: null, error: null, issues: [], mutedIssues: 0, mode: "idle" };
         }
         const system = await glances.system();
         return {
@@ -148,6 +164,7 @@ export async function buildServicesState(): Promise<ServicesState> {
           responseMs: system.durationMs,
           error: system.ok ? null : system.message,
           issues: [],
+          mutedIssues: 0,
           mode: "poll",
         };
       })(),
