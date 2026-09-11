@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/shell/AppShell";
-import { BentoGrid } from "@/components/ui/Panel";
+import { BentoColumns } from "@/components/ui/Panel";
 import { HeadlineNumbers } from "@/components/panels/HeadlineNumbers";
 import { NowPlaying } from "@/components/panels/NowPlaying";
 import { QueuePanel } from "@/components/panels/QueuePanel";
@@ -7,13 +7,26 @@ import { ServiceStatusRow } from "@/components/panels/ServiceStatusRow";
 import { CapacitySummary, TotalCapacity } from "@/components/panels/StoragePanels";
 import { HealthWarnings } from "@/components/panels/HealthWarnings";
 import { MachineSummary } from "@/components/panels/MachineSummary";
+import { AlertsPanel } from "@/components/panels/AlertsPanel";
 
 /**
  * Overview — the single screen that answers "is everything fine".
  *
- * Order is priority order, and it holds on mobile where everything collapses
- * to one column: what's happening now, then what might be wrong, then the
- * numbers, then the detail.
+ * Two columns rather than a wrapping grid. These tiles differ enormously in
+ * height — an idle "now playing" is a couple of lines, the server panel is
+ * three gauges, a noisy health list is a dozen rows — and in any row-based
+ * layout the short ones leave dead space beneath them, because a row is as
+ * tall as its tallest member. Columns have no rows to align to.
+ *
+ * The split is by pace, not by importance: the left column is what you look at
+ * (what's playing, what you own, how full it is), the right is what watches
+ * you (the machine, warnings, alerting). Services spans the full width at the
+ * bottom, where a six-across row belongs. Alerts sits in the right column both
+ * because it belongs with the watching, and because it keeps the two columns
+ * near enough in height that neither ends far short of the other.
+ *
+ * Priority still reads top-down within each column, and on mobile the columns
+ * collapse into one stack in exactly that order.
  */
 export default function OverviewPage() {
   return (
@@ -23,25 +36,25 @@ export default function OverviewPage() {
         description="Everything at a glance — streams, capacity, and service health."
       />
 
-      {/* Order is priority order, but it also has to TILE. Spans are chosen so
-          the common states sum to 12 across a row:
-            row 1  now playing 4 + total storage 4 + server 4
-            row 2  health 6 + capacity 6
-            row 3  library 12
-            row 4  queue 4 + services 8
-          Dense auto-flow backfills whatever a state change knocks out of
-          alignment, and items-start keeps a short tile from leaving a
-          full-height void beside a tall one. */}
-      <BentoGrid>
-        <NowPlaying />
-        <TotalCapacity />
-        <MachineSummary />
-        <HealthWarnings />
-        <CapacitySummary />
-        <HeadlineNumbers />
-        <QueuePanel />
-        <ServiceStatusRow />
-      </BentoGrid>
+      <BentoColumns
+        primary={
+          <>
+            <NowPlaying />
+            <HeadlineNumbers />
+            <CapacitySummary />
+            <QueuePanel />
+          </>
+        }
+        secondary={
+          <>
+            <TotalCapacity />
+            <MachineSummary />
+            <HealthWarnings />
+            <AlertsPanel />
+          </>
+        }
+        footer={<ServiceStatusRow />}
+      />
     </>
   );
 }

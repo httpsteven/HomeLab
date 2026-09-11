@@ -93,6 +93,47 @@ export function PanelBody({ children, className }: { children: ReactNode; classN
   return <div className={cn("flex-1 px-4 pb-4 sm:px-5 sm:pb-5", className)}>{children}</div>;
 }
 
+/**
+ * Column layout, for pages whose tiles vary wildly in height.
+ *
+ * Rows are the problem: in both a grid and a flex-wrap, a row is as tall as
+ * its tallest member, so a short tile beside a tall one leaves dead space
+ * underneath it that nothing can fill. Columns don't have rows — each one
+ * stacks independently and is exactly as tall as its own contents, so the only
+ * empty space left is below the shortest column.
+ *
+ * Tiles are assigned to a column deliberately rather than flowed
+ * automatically. With data updating every couple of seconds, automatic
+ * balancing (CSS `columns`) would let a tile jump between columns whenever its
+ * height changed, which is far more distracting than a little raggedness at
+ * the bottom.
+ *
+ * The child overrides neutralise the flex-basis each Panel carries for the
+ * wrap layout; inside a column a tile simply fills the width.
+ */
+const COLUMN = "flex min-w-0 flex-col gap-3 sm:gap-4 [&>*]:!basis-auto [&>*]:!grow-0 [&>*]:w-full";
+
+export function BentoColumns({
+  primary,
+  secondary,
+  footer,
+}: {
+  primary: ReactNode;
+  secondary: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:gap-4">
+      <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row">
+        {/* Wider, because it carries the tiles with the most to show. */}
+        <div className={cn(COLUMN, "flex-1 lg:flex-[1.35]")}>{primary}</div>
+        <div className={cn(COLUMN, "flex-1")}>{secondary}</div>
+      </div>
+      {footer ? <div className={COLUMN}>{footer}</div> : null}
+    </div>
+  );
+}
+
 /** The 12-column bento grid every page composes into. */
 export function BentoGrid({ children, className }: { children: ReactNode; className?: string }) {
   return (
