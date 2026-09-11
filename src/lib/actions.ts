@@ -6,6 +6,7 @@ import { radarr } from "@/lib/clients/radarr";
 import { sonarr } from "@/lib/clients/sonarr";
 import { invalidateMedia } from "@/lib/aggregate/media-cache";
 import { refreshNow, refreshSoon } from "@/lib/collect/collector";
+import { sendTestAlert } from "@/lib/alerts";
 import type { ArrClient } from "@/lib/clients/arr";
 
 /**
@@ -173,6 +174,10 @@ export const ACTIONS: Record<string, Handler> = {
     refreshSoon("subtitles", 2_000);
     return { ok: true, message: "Searching for subtitles." };
   },
+
+  /* --- Alerts ------------------------------------------------------- */
+  /** Delivery test. Sends only to endpoints you configured yourself. */
+  "alerts.test": async () => sendTestAlert(),
 
   /* --- Plex --------------------------------------------------------- */
   /** Disruptive but not destructive — it stops a playback session, it does

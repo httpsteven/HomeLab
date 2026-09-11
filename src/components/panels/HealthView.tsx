@@ -6,6 +6,7 @@ import { Freshness } from "@/components/shell/ConnectionIndicator";
 import { NotConfigured, Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
 import { StatusBadge, StatusDot } from "@/components/ui/Status";
 import { formatBytes, formatNumber } from "@/lib/format";
+import { AlertsPanel } from "./AlertsPanel";
 import { HealthWarnings } from "./HealthWarnings";
 import { QueuePanel } from "./QueuePanel";
 import { ServiceStatusRow } from "./ServiceStatusRow";
@@ -367,6 +368,7 @@ export function HealthView() {
     <>
       <ServiceStatusRow />
       <HealthWarnings />
+      <AlertsPanel />
       <MachinePanels />
       <QueuePanel limit={10} />
       <SubtitlePanel />

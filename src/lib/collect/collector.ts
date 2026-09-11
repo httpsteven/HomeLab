@@ -22,6 +22,8 @@ import {
   setSlotNotConfigured,
 } from "./store";
 import { recordSnapshotIfDue } from "@/lib/history";
+import { evaluateAlerts } from "@/lib/alerts";
+import { markCollectorStart } from "@/lib/alerts/state";
 import {
   demoActivity,
   demoLibrary,
@@ -161,6 +163,10 @@ async function runSource(source: Source): Promise<void> {
 
   if (isDemoMode()) {
     setSlotData(source.key, DEMO_SOURCES[source.key]() as never, "poll");
+    // Alerts are evaluated in demo mode too. Demo exists so behaviour can be
+    // exercised without a real problem to wait for, and alerting is precisely
+    // the thing you want to have verified BEFORE you need it.
+    void evaluateAlerts();
     schedule(source, source.requiresClients ? source.intervalMs : 30_000);
     return;
   }
@@ -184,6 +190,11 @@ async function runSource(source: Source): Promise<void> {
     const data = await source.run();
     runner.failures = 0;
     setSlotData(source.key, data as never);
+
+    // Evaluated after the data lands rather than on its own timer, so an
+    // alert fires as soon as the state that triggers it exists. Detached and
+    // swallowing its own errors: alerting must never stall collection.
+    void evaluateAlerts();
 
     // Storage refresh is also when a history snapshot is due.
     if (source.key === "storage") {
@@ -239,6 +250,11 @@ export function refreshSoon(key: SlotKey, delayMs = 1_500): void {
 export function startCollector(): void {
   if (collector.started) return;
   collector.started = true;
+
+  // Anchors the startup grace period. Slots fill in over several seconds, and
+  // an empty services slot is indistinguishable from every service being down
+  // — without this every restart would announce a full outage.
+  markCollectorStart();
 
   for (const source of SOURCES) {
     collector.runners.set(source.key, { timer: null, failures: 0, running: false });

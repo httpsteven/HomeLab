@@ -181,6 +181,48 @@ releases.
 
 ---
 
+## Alerts
+
+Tells you when something needs attention instead of waiting to be looked at.
+Fires on: a mount crossing 90% (or 80% as a warning), a service going
+unreachable, a stalled import, a **pool member filling while the pool still
+looks healthy**, and a sensor passing its critical temperature.
+
+Pick a transport — either or both:
+
+```bash
+# Phone push. No account: install the ntfy app, subscribe to a topic name only
+# you know, and use it here.
+ALERT_NTFY_URL=https://ntfy.sh/your-unguessable-topic-name
+
+# Discord: Server Settings -> Integrations -> Webhooks -> New Webhook -> Copy URL
+ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+Then confirm delivery before you need it — Health page → Alerts → **Send test**.
+
+### Why it won't spam you
+
+The collector evaluates every couple of seconds. Naively that would notify
+about a full disk roughly 30,000 times a day, so:
+
+- **Edge-triggered** — fires when a condition becomes true, not while it is.
+- **Hysteresis** — alerts at 90%, and won't clear until it drops below 87%, so
+  a disk sitting on the threshold doesn't flap.
+- **Resolve notifications** when a condition clears.
+- **Repeat interval** (`ALERT_REPEAT_HOURS`, default 12) for things that stay
+  true. An escalation from warning to critical always re-notifies.
+- **Startup grace** (`ALERT_STARTUP_GRACE_SECONDS`, default 90) — a half-loaded
+  state looks exactly like a total outage. Conditions during the grace are
+  neither sent *nor* recorded, so a disk that is already full at boot still
+  alerts once the grace ends.
+- **Persisted** to `data/alerts.json`, so a restart doesn't re-announce what
+  you already know.
+
+`ALERT_MIN_LEVEL=critical` if warnings are too chatty.
+
+---
+
 ## Demo mode
 
 To see the dashboard populated before connecting anything:
