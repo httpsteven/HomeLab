@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { RefreshCw, Search } from "lucide-react";
 import { useSlot } from "@/components/DashboardProvider";
 import { Freshness } from "@/components/shell/ConnectionIndicator";
@@ -133,7 +134,10 @@ function useLibraryItems() {
 }
 
 function ItemTable({ items }: { items: LibraryItem[] }) {
-  const [query, setQuery] = useState("");
+  // The command palette deep-links here with ?q=<title>, so selecting a result
+  // lands on the table pre-filtered rather than at the top of 1,000+ rows.
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [kind, setKind] = useState<KindFilter>("all");
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("title");

@@ -17,11 +17,37 @@ import type { LibraryItem } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+/** Just enough to search and route to an item. */
+export interface CompactLibraryItem {
+  id: number;
+  kind: LibraryItem["kind"];
+  title: string;
+  year: number | null;
+}
+
+export async function GET(request: Request) {
+  // ?compact=1 drops everything the command palette doesn't need. The full
+  // payload is ~435 KB on a real library; the palette only searches titles and
+  // routes by id, so shipping quality, codec, path and genres to it is waste.
+  const compact = new URL(request.url).searchParams.get("compact") === "1";
+
   try {
     const items: LibraryItem[] = isDemoMode()
       ? demoLibraryItems()
       : await buildLibraryItems();
+
+    if (compact) {
+      const slim: CompactLibraryItem[] = items.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        title: item.title,
+        year: item.year,
+      }));
+      return Response.json(
+        { items: slim, error: null },
+        { headers: { "Cache-Control": "private, max-age=60" } },
+      );
+    }
 
     return Response.json(
       { items, error: null },

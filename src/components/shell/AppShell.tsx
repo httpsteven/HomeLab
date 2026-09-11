@@ -12,8 +12,11 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Search } from "lucide-react";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { Logo } from "@/components/ui/Logo";
+import { CommandPalette } from "@/components/palette/CommandPalette";
+import { PaletteProvider, usePalette } from "@/components/palette/PaletteProvider";
 
 const NAV = [
   { href: "/", label: "Overview", Icon: LayoutGrid },
@@ -24,6 +27,55 @@ const NAV = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <PaletteProvider>
+      <Shell>{children}</Shell>
+      <CommandPalette />
+    </PaletteProvider>
+  );
+}
+
+/**
+ * The palette trigger.
+ *
+ * Shows the keyboard shortcut on desktop, where that's the fast path, and
+ * collapses to an icon button on mobile — where there is no ⌘K, so the button
+ * IS the only way in.
+ */
+function PaletteTrigger() {
+  const { setOpen } = usePalette();
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        // Explicit name: the visible label sits beside a ⌘K hint, and relying
+        // on concatenated content left this button unnamed in the
+        // accessibility tree.
+        aria-label="Search titles, pages and actions"
+        aria-keyshortcuts="Meta+K Control+K"
+        className="hidden items-center gap-2 rounded-lg bg-surface-2 py-1.5 pr-2 pl-2.5 text-xs text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink-secondary md:flex"
+      >
+        <Search size={13} aria-hidden />
+        <span>Search</span>
+        <kbd className="metric rounded border border-[var(--glass-border)] px-1.5 py-0.5 text-[10px]">
+          ⌘K
+        </kbd>
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Search titles, pages and actions"
+        className="grid size-9 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink-secondary md:hidden"
+      >
+        <Search size={16} aria-hidden />
+      </button>
+    </>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
@@ -59,6 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <PaletteTrigger />
             <ConnectionIndicator />
             <Link
               href="/setup"
