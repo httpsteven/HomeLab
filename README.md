@@ -199,7 +199,20 @@ ALERT_NTFY_URL=https://ntfy.sh/your-unguessable-topic-name
 ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
 
+Set `DASHBOARD_URL` too — it makes notifications **tappable**, deep-linked to
+the page the alert is about:
+
+```bash
+DASHBOARD_URL=https://steven-plex.your-tailnet.ts.net
+```
+
 Then confirm delivery before you need it — Health page → Alerts → **Send test**.
+
+Discord gets a proper embed rather than a wall of bold text: colour-coded by
+severity using the same reserved status palette as the dashboard, a title that
+links straight to the relevant page, structured fields for the numbers, and a
+timestamp. ntfy gets markdown, a matching priority (critical breaks through Do
+Not Disturb; resolved notices don't), and a tap action.
 
 ### Why it won't spam you
 

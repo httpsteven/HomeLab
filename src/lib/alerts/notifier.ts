@@ -1,5 +1,5 @@
 import "server-only";
-import type { AlertLevel } from "./conditions";
+import type { AlertLevel, ConditionField } from "./conditions";
 
 /**
  * Delivery. Two transports, both optional, both fire-and-forget.
@@ -41,6 +41,48 @@ export interface Notification {
   level: AlertLevel | "resolved";
   title: string;
   body: string;
+  fields?: ConditionField[];
+  /** Dashboard route this concerns; becomes a tap target. */
+  path?: string;
+}
+
+/**
+ * Embed accent, matching the dashboard's reserved status palette so a red
+ * notification means the same thing a red bar does.
+ */
+const EMBED_COLOR: Record<Notification["level"], number> = {
+  critical: 0xd0_3b_3b,
+  warning: 0xfa_b2_19,
+  resolved: 0x0c_a3_0c,
+};
+
+const LEVEL_EMOJI: Record<Notification["level"], string> = {
+  critical: "🔴",
+  warning: "🟡",
+  resolved: "🟢",
+};
+
+/** Where this dashboard is reachable, for links in notifications. */
+function dashboardUrl(): string | null {
+  const raw = process.env.DASHBOARD_URL?.trim();
+  if (!raw) return null;
+
+  // Validated, because Discord rejects an embed carrying a malformed `url` —
+  // a typo here would otherwise break every notification rather than just the
+  // link inside it.
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return raw.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function linkFor(notification: Notification): string | null {
+  const base = dashboardUrl();
+  if (!base) return null;
+  return `${base}${notification.path ?? "/"}`;
 }
 
 /** ntfy maps priority to how intrusive the phone notification is. */
@@ -63,8 +105,19 @@ export interface SendResult {
   detail?: string;
 }
 
+/** Markdown body: the detail fields read better as a list than inline prose. */
+function ntfyBody(notification: Notification): string {
+  const lines = [notification.body];
+  if (notification.fields?.length) {
+    lines.push("");
+    for (const field of notification.fields) lines.push(`**${field.name}:** ${field.value}`);
+  }
+  return lines.join("\n");
+}
+
 async function sendNtfy(config: AlertsConfig, notification: Notification): Promise<SendResult | null> {
   if (!config.ntfyUrl) return null;
+  const link = linkFor(notification);
 
   try {
     const response = await fetch(config.ntfyUrl, {
@@ -75,9 +128,14 @@ async function sendNtfy(config: AlertsConfig, notification: Notification): Promi
         Title: notification.title.replace(/[^\x20-\x7E]/g, ""),
         Priority: NTFY_PRIORITY[notification.level],
         Tags: NTFY_TAGS[notification.level],
+        Markdown: "yes",
+        // Tapping the notification opens the page it's about, rather than
+        // leaving you to find it.
+        ...(link ? { Click: link } : {}),
+        ...(link ? { Actions: `view, Open dashboard, ${link}` } : {}),
         ...(config.ntfyToken ? { Authorization: `Bearer ${config.ntfyToken}` } : {}),
       },
-      body: notification.body,
+      body: ntfyBody(notification),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
 
@@ -96,8 +154,17 @@ async function sendNtfy(config: AlertsConfig, notification: Notification): Promi
   }
 }
 
-/** Discord validates its webhook body; other receivers generally don't. */
+/**
+ * Discord validates its webhook body; other receivers generally don't.
+ *
+ * Auto-detected from the host, and overridable with ALERT_WEBHOOK_FORMAT for
+ * anything speaking Discord's shape behind a different hostname — a proxy, a
+ * self-hosted relay, or a compatible bot endpoint.
+ */
 function isDiscord(url: string): boolean {
+  const override = process.env.ALERT_WEBHOOK_FORMAT?.trim().toLowerCase();
+  if (override === "discord") return true;
+  if (override === "generic") return false;
   return /discord(app)?\.com\/api\/webhooks\//i.test(url);
 }
 
@@ -110,11 +177,33 @@ async function sendWebhook(
   // Discord's webhook body is validated, so it gets ONLY the fields it
   // documents. Anything else receives the richer payload, which is more
   // useful to a receiver that can read it.
+  const link = linkFor(notification);
+
   const payload = isDiscord(config.webhookUrl)
     ? {
-        // Discord caps content at 2000 characters and rejects an empty one.
-        content: `**${notification.title}**\n${notification.body}`.slice(0, 1900),
         username: "Home Lab",
+        // An embed rather than plain content: it carries a colour matching the
+        // severity, structured fields, and a timestamp — all of which a wall of
+        // bold text can't.
+        embeds: [
+          {
+            title: `${LEVEL_EMOJI[notification.level]}  ${notification.title}`.slice(0, 250),
+            description: notification.body.slice(0, 1900),
+            color: EMBED_COLOR[notification.level],
+            ...(link ? { url: link } : {}),
+            ...(notification.fields?.length
+              ? {
+                  fields: notification.fields.slice(0, 25).map((field) => ({
+                    name: field.name.slice(0, 250),
+                    value: field.value.slice(0, 1000) || "—",
+                    inline: field.inline ?? false,
+                  })),
+                }
+              : {}),
+            footer: { text: "Home Lab" },
+            timestamp: new Date().toISOString(),
+          },
+        ],
       }
     : {
         content: `**${notification.title}**\n${notification.body}`,

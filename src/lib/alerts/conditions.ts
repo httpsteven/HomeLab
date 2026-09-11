@@ -11,6 +11,14 @@ import type { DashboardState } from "@/lib/types";
 
 export type AlertLevel = "warning" | "critical";
 
+/** A labelled detail, rendered as a field in a Discord embed. */
+export interface ConditionField {
+  name: string;
+  value: string;
+  /** Short values sit side by side; long ones get their own row. */
+  inline?: boolean;
+}
+
 export interface Condition {
   /**
    * Stable identity for this condition across evaluations.
@@ -23,6 +31,10 @@ export interface Condition {
   level: AlertLevel;
   title: string;
   body: string;
+  /** Structured detail — better than cramming numbers into the body text. */
+  fields?: ConditionField[];
+  /** Dashboard route this concerns, so a notification can be tapped to it. */
+  path?: string;
 }
 
 /**
@@ -56,7 +68,13 @@ export function deriveConditions(
           key,
           level: "critical",
           title: `${mount.label} is ${formatPercent(mount.usedFraction, 0)} full`,
-          body: `${formatBytes(mount.free)} free of ${formatBytes(mount.total)} on ${mount.path}.`,
+          body: `Only ${formatBytes(mount.free)} left on \`${mount.path}\`.`,
+          fields: [
+            { name: "Free", value: formatBytes(mount.free), inline: true },
+            { name: "Used", value: formatBytes(mount.used), inline: true },
+            { name: "Capacity", value: formatBytes(mount.total), inline: true },
+          ],
+          path: "/storage",
         });
         continue;
       }
@@ -66,7 +84,13 @@ export function deriveConditions(
           key,
           level: "warning",
           title: `${mount.label} is ${formatPercent(mount.usedFraction, 0)} full`,
-          body: `${formatBytes(mount.free)} free of ${formatBytes(mount.total)} on ${mount.path}.`,
+          body: `${formatBytes(mount.free)} still free on \`${mount.path}\`.`,
+          fields: [
+            { name: "Free", value: formatBytes(mount.free), inline: true },
+            { name: "Used", value: formatBytes(mount.used), inline: true },
+            { name: "Capacity", value: formatBytes(mount.total), inline: true },
+          ],
+          path: "/storage",
         });
       }
     }
@@ -87,9 +111,13 @@ export function deriveConditions(
           level: "warning",
           title: `${member.label} is nearly full inside ${pool.label}`,
           body:
-            `${member.label} is ${formatPercent(member.usedFraction, 0)} full while the pool ` +
-            `is only ${formatPercent(pool.usedFraction, 0)}. Writes landing on that drive can ` +
-            `fail even though the pool has room.`,
+            `Writes landing on that drive can fail even though the pool reports room.`,
+          fields: [
+            { name: "Drive", value: formatPercent(member.usedFraction, 0) + " full", inline: true },
+            { name: "Pool", value: formatPercent(pool.usedFraction, 0) + " full", inline: true },
+            { name: "Free on drive", value: formatBytes(member.free), inline: true },
+          ],
+          path: "/storage",
         });
       }
     }
@@ -105,6 +133,7 @@ export function deriveConditions(
         level: "critical",
         title: `${service.label} is unreachable`,
         body: service.error ?? "No response from the service.",
+        path: "/health",
       });
     }
   }
@@ -117,10 +146,12 @@ export function deriveConditions(
       key: "queue-failed",
       level: "warning",
       title: `${queue.counts.failed} stalled ${queue.counts.failed === 1 ? "import" : "imports"}`,
-      body: failed
-        .slice(0, 3)
-        .map((item) => item.title)
-        .join("\n") || "Check the download queue.",
+      body:
+        failed
+          .slice(0, 3)
+          .map((item) => `• ${item.title}`)
+          .join("\n") || "Check the download queue.",
+      path: "/health",
     });
   }
 
@@ -136,7 +167,12 @@ export function deriveConditions(
           key,
           level: "critical",
           title: `${sensor.label} at ${sensor.value.toFixed(0)}°C`,
-          body: `Critical threshold for this sensor is ${sensor.critical}°C.`,
+          body: "Running hot.",
+          fields: [
+            { name: "Now", value: `${sensor.value.toFixed(0)}°C`, inline: true },
+            { name: "Critical at", value: `${sensor.critical}°C`, inline: true },
+          ],
+          path: "/health",
         });
       }
     }

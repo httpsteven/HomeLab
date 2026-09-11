@@ -64,6 +64,8 @@ export async function evaluateAlerts(): Promise<void> {
         level: condition.level,
         title: condition.title,
         body: condition.body,
+        fields: condition.fields,
+        path: condition.path,
       });
       // Only record it as notified if delivery actually worked, so a transient
       // outage at the notification endpoint doesn't silently swallow an alert.
@@ -73,8 +75,9 @@ export async function evaluateAlerts(): Promise<void> {
     for (const alert of resolved) {
       await notify(config, {
         level: "resolved",
-        title: `Resolved: ${alert.title}`,
-        body: "This condition has cleared.",
+        title: alert.title,
+        body: "This has cleared.",
+        path: alert.path,
       });
     }
 
@@ -125,8 +128,13 @@ export async function sendTestAlert(): Promise<{ ok: boolean; message: string }>
 
   const results = await notifyDetailed(config, {
     level: "warning",
-    title: "Home Lab test alert",
-    body: "If you're reading this on your phone, alerting works.",
+    title: "Test alert",
+    body: "Alerting is wired up correctly. This is what a warning looks like.",
+    fields: [
+      { name: "Triggered by", value: "Manual test", inline: true },
+      { name: "Severity", value: "Warning", inline: true },
+    ],
+    path: "/health",
   });
 
   const delivered = results.filter((result) => result.ok);

@@ -36,6 +36,8 @@ export interface ActiveAlert {
   title: string;
   firstSeen: number;
   lastNotified: number;
+  /** Carried so the resolve notification links to the same page. */
+  path?: string;
 }
 
 export interface SentAlert {
@@ -172,6 +174,7 @@ export async function commitDiff(
       title: condition.title,
       firstSeen: existing?.firstSeen ?? now,
       lastNotified: notifiedKeys.has(condition.key) ? now : (existing?.lastNotified ?? now),
+      path: condition.path,
     };
   }
 
