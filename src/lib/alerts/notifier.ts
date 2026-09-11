@@ -56,8 +56,15 @@ const NTFY_TAGS: Record<Notification["level"], string> = {
   resolved: "white_check_mark",
 };
 
-async function sendNtfy(config: AlertsConfig, notification: Notification): Promise<boolean> {
-  if (!config.ntfyUrl) return false;
+/** Why a send failed, so the UI can say something more useful than "rejected". */
+export interface SendResult {
+  ok: boolean;
+  transport: string;
+  detail?: string;
+}
+
+async function sendNtfy(config: AlertsConfig, notification: Notification): Promise<SendResult | null> {
+  if (!config.ntfyUrl) return null;
 
   try {
     const response = await fetch(config.ntfyUrl, {
@@ -73,33 +80,84 @@ async function sendNtfy(config: AlertsConfig, notification: Notification): Promi
       body: notification.body,
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
-    return response.ok;
-  } catch {
-    return false;
+
+    if (response.ok) return { ok: true, transport: "ntfy" };
+    return {
+      ok: false,
+      transport: "ntfy",
+      detail: `HTTP ${response.status} — ${(await response.text()).slice(0, 200)}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      transport: "ntfy",
+      detail: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
-async function sendWebhook(config: AlertsConfig, notification: Notification): Promise<boolean> {
-  if (!config.webhookUrl) return false;
+/** Discord validates its webhook body; other receivers generally don't. */
+function isDiscord(url: string): boolean {
+  return /discord(app)?\.com\/api\/webhooks\//i.test(url);
+}
+
+async function sendWebhook(
+  config: AlertsConfig,
+  notification: Notification,
+): Promise<SendResult | null> {
+  if (!config.webhookUrl) return null;
+
+  // Discord's webhook body is validated, so it gets ONLY the fields it
+  // documents. Anything else receives the richer payload, which is more
+  // useful to a receiver that can read it.
+  const payload = isDiscord(config.webhookUrl)
+    ? {
+        // Discord caps content at 2000 characters and rejects an empty one.
+        content: `**${notification.title}**\n${notification.body}`.slice(0, 1900),
+        username: "Home Lab",
+      }
+    : {
+        content: `**${notification.title}**\n${notification.body}`,
+        level: notification.level,
+        title: notification.title,
+        body: notification.body,
+      };
 
   try {
     const response = await fetch(config.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // `content` is what Discord and most webhook receivers read; the extra
-      // fields are ignored by those and useful to anything else.
-      body: JSON.stringify({
-        content: `**${notification.title}**\n${notification.body}`,
-        level: notification.level,
-        title: notification.title,
-        body: notification.body,
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
-    return response.ok;
-  } catch {
-    return false;
+
+    if (response.ok) return { ok: true, transport: "webhook" };
+    return {
+      ok: false,
+      transport: "webhook",
+      // Discord explains the rejection precisely; passing it through beats
+      // any message this code could invent.
+      detail: `HTTP ${response.status} — ${(await response.text()).slice(0, 200)}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      transport: "webhook",
+      detail: error instanceof Error ? error.message : String(error),
+    };
   }
+}
+
+/** Results from every configured transport. */
+export async function notifyDetailed(
+  config: AlertsConfig,
+  notification: Notification,
+): Promise<SendResult[]> {
+  const results = await Promise.all([
+    sendNtfy(config, notification),
+    sendWebhook(config, notification),
+  ]);
+  return results.filter((result): result is SendResult => result !== null);
 }
 
 /** True if at least one transport accepted it. */
@@ -107,11 +165,8 @@ export async function notify(
   config: AlertsConfig,
   notification: Notification,
 ): Promise<boolean> {
-  const results = await Promise.all([
-    sendNtfy(config, notification),
-    sendWebhook(config, notification),
-  ]);
-  return results.some(Boolean);
+  const results = await notifyDetailed(config, notification);
+  return results.some((result) => result.ok);
 }
 
 export function meetsMinLevel(level: AlertLevel, minLevel: AlertLevel): boolean {

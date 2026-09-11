@@ -1,7 +1,13 @@
 import "server-only";
 import { getState } from "@/lib/collect/store";
 import { deriveConditions } from "./conditions";
-import { alertsConfig, meetsMinLevel, notify, type AlertsConfig } from "./notifier";
+import {
+  alertsConfig,
+  meetsMinLevel,
+  notify,
+  notifyDetailed,
+  type AlertsConfig,
+} from "./notifier";
 import {
   activeAlerts,
   commitDiff,
@@ -117,13 +123,23 @@ export async function sendTestAlert(): Promise<{ ok: boolean; message: string }>
     };
   }
 
-  const ok = await notify(config, {
+  const results = await notifyDetailed(config, {
     level: "warning",
     title: "Home Lab test alert",
     body: "If you're reading this on your phone, alerting works.",
   });
 
-  return ok
-    ? { ok: true, message: `Test sent via ${config.ntfyUrl ? "ntfy" : "webhook"}.` }
-    : { ok: false, message: "Every configured transport rejected the message." };
+  const delivered = results.filter((result) => result.ok);
+  if (delivered.length > 0) {
+    return { ok: true, message: `Test delivered via ${delivered.map((r) => r.transport).join(" and ")}.` };
+  }
+
+  // Pass the receiver's own explanation through. "Rejected" on its own tells
+  // you nothing; Discord and ntfy both say precisely what was wrong, and
+  // inventing a vaguer message on top of that helps no one.
+  const reasons = results
+    .map((result) => `${result.transport}: ${result.detail ?? "rejected"}`)
+    .join(" · ");
+
+  return { ok: false, message: reasons || "No transport configured." };
 }
