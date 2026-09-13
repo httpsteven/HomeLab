@@ -30,9 +30,34 @@ services:
 
     env_file:
       - .env.local
+    # Run as the host user that owns ./data.
+    #
+    # The shorts pipeline (a Python process on the host) and this container BOTH
+    # write to data/shorts.db — the pipeline owns the schema and the clip rows,
+    # the dashboard writes jobs, review state and the viewer heartbeat. SQLite in
+    # WAL mode also creates -wal and -shm files beside it, so both need write
+    # access to the DIRECTORY, not just the file.
+    #
+    # Set these in .env.local (or export them) to your own id: `id -u`, `id -g`.
+    # Without this the container runs as uid 1001 and one side or the other gets
+    # "attempt to write a readonly database".
+    user: "${DASHBOARD_UID:-1001}:${DASHBOARD_GID:-1001}"
+
     volumes:
-      # Growth history — keep this so the storage chart survives redeploys.
+      # Growth history and the shorts database — keep this so both survive
+      # redeploys.
       - ./data:/app/data
+
+      # Generated clips, read-only.
+      #
+      # Mounted at the SAME path it has on the host, deliberately: the database
+      # stores absolute paths to each .mp4, and the media route resolves them
+      # as-is. A different mount point inside the container would make every
+      # clip 410 "missing on disk" while the rows look perfectly fine.
+      #
+      # Change both sides together if your output directory isn't here, and keep
+      # them identical. Comment this out if you don't run the shorts pipeline.
+      - /srv/shorts_output:/srv/shorts_output:ro
 
   # Machine metrics: CPU, memory, temperatures, disk I/O, network.
   #

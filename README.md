@@ -27,9 +27,20 @@ plays over time, top titles, top users.
 Glances, beside each service's own health warnings, the download queue with failures called out,
 and Bazarr's subtitle coverage.
 
-**Control** — safe actions only: refresh, rescan, search, toggle monitored, retry a stalled import,
-trigger a subtitle search, and stop a Plex stream (behind a confirmation). There is no delete,
-remove or blocklist anywhere in the codebase.
+**Shorts** — vertical clips cut from the library by the
+[shortsCreator](../shortsCreator) pipeline, with the subtitle coverage that made them possible.
+Browse and filter every generated clip, play it inline, triage it before uploading, and see why
+items that produced nothing were skipped. See [Shorts](#shorts-1) below.
+
+**Control** — safe actions only against your media services: refresh, rescan, search, toggle
+monitored, retry a stalled import, trigger a subtitle search, and stop a Plex stream (behind a
+confirmation). Nothing in your Plex, Sonarr or Radarr libraries can be deleted, removed or
+blocklisted from here.
+
+The one thing that *can* be deleted is a clip the shorts pipeline generated — its `.mp4` and
+thumbnail, behind a confirmation. That is scoped deliberately: the deletion runs in the pipeline's
+own worker, which refuses to unlink anything outside its configured output directory, so source
+media is never a delete target.
 
 ---
 
@@ -110,6 +121,67 @@ Polling is deliberately modest: one Glances request every 3s, one Tautulli
 activity call every 2s, and the expensive library enumeration only every 10
 minutes. If you see substantially more traffic than that hitting a service,
 that's a bug worth reporting.
+
+---
+
+## Shorts
+
+The [shortsCreator](../shortsCreator) pipeline turns the library into vertical 9:16 clips with
+burned-in captions. It runs as a separate Python process; this dashboard is where you look at what
+it produced and steer what it does next.
+
+### How they talk
+
+**One SQLite file, no HTTP between them.** The pipeline writes; the dashboard reads, and writes
+only to the three tables it owns (`jobs`, `review`, `lab_state`). WAL mode means neither blocks the
+other.
+
+```bash
+# In the dashboard's .env.local — both default to sensible places.
+SHORTS_DB_PATH=/app/data/shorts.db     # already a mounted volume
+SHORTS_OUTPUT_DIR=/srv/shorts_output   # where the clips live
+```
+
+`SHORTS_OUTPUT_DIR` is not optional if you want playback: the media route refuses to serve any file
+outside it.
+
+### What the page shows
+
+- **Clips** — every generated short, filterable by show, category, caption source, series vs
+  single, review state and match confidence, searchable across titles and quotes. Click to play
+  inline; approve, favourite, reject or delete.
+- **Subtitle coverage** — the "do I have subtitles?" answer for the whole library, with a specific
+  reason code per failing item. `LOW_COVERAGE_LIKELY_FORCED` is the one worth understanding: a
+  forced subtitle track parses perfectly and can carry *more* cues than a healthy one, while
+  covering only foreign-language lines. Two fixes are one click away per item — upload a subtitle
+  file, or queue it for transcription.
+- **Pipeline** — queued and running jobs, run history with skip reasons, and test-suite results.
+
+### Queued, not called
+
+Buttons here insert a row into `jobs`; the pipeline's worker drains the queue. Nothing long-running
+executes inside a request handler, and — more importantly — everything queued still passes through
+the pipeline's viewer gate.
+
+### It pauses while you're watching
+
+The media box is also the Plex server, so pipeline work must never degrade playback. The dashboard
+already knows who is streaming, so it publishes that to `lab_state` and the worker reads it. No
+second connection to Plex, no duplicated polling.
+
+The banner at the top of the page says which state it's in — `2 streams active`, `cooling down`,
+or `clear to run` — because a queue that deliberately does nothing for an hour is otherwise
+indistinguishable from a broken worker.
+
+One subtlety worth knowing: a **stale** heartbeat makes the worker pause, on the grounds that if
+the dashboard stopped reporting we don't know who's watching. So when Tautulli isn't configured at
+all, the dashboard publishes an explicit "nobody watching" rather than going silent — otherwise an
+integration that was simply never set up would pause the pipeline forever.
+
+### Native module
+
+`better-sqlite3` is a native addon. Its prebuilt binaries are glibc-only, so the Alpine image
+compiles it from source — which is why the Dockerfile's deps stage installs `python3 make g++`.
 
 ---
 
