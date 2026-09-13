@@ -25,6 +25,25 @@ export interface ServiceConfig {
   apiKey: string | null;
   /** Glances has no auth, so a URL alone is enough to be configured. */
   requiresKey: boolean;
+  /**
+   * A file on disk rather than an endpoint.
+   *
+   * `url` then holds a path, which must not be run through normalizeUrl —
+   * that would turn /app/data/shorts.db into http:///app/data/shorts.db.
+   */
+  local?: boolean;
+}
+
+/**
+ * Where the shorts pipeline's database lives.
+ *
+ * Defined here rather than in the client so the service registry and the
+ * client cannot disagree about it — a disagreement would show as "not
+ * configured" on /setup while the page itself worked perfectly.
+ */
+export function shortsDatabasePath(): string {
+  const configured = process.env.SHORTS_DB_PATH?.trim();
+  return configured || `${process.cwd()}/data/shorts.db`;
 }
 
 /** Strip trailing slashes so we can always join with a leading-slash path. */
@@ -63,22 +82,28 @@ export function getServiceConfig(id: ServiceId): ServiceConfig {
     // and no key; `isConfigured` for it is "does the file exist", which
     // lives in the client. The entry exists so /setup and /api/diag list it
     // alongside everything else.
-    shorts: { url: undefined, key: undefined, requiresKey: false },
+    shorts: { url: shortsDatabasePath(), key: undefined, requiresKey: false },
   };
 
   const entry = map[id];
+  const local = id === "shorts";
   return {
     id,
     label: SERVICE_LABELS[id],
-    url: normalizeUrl(entry.url),
+    url: local ? (clean(entry.url) ?? null) : normalizeUrl(entry.url),
     apiKey: clean(entry.key),
     requiresKey: entry.requiresKey,
+    local,
   };
 }
 
 export function isConfigured(config: ServiceConfig): boolean {
   if (!config.url) return false;
   if (config.requiresKey && !config.apiKey) return false;
+  // A local service is configured once it has a path. Whether the file opens
+  // is the PROBE's job to report — "configured but failing, here's why" is
+  // actionable, where "not configured" sends you looking for a setting that is
+  // already set.
   return true;
 }
 

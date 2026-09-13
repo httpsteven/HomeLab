@@ -1,6 +1,6 @@
 import "server-only";
 import Database from "better-sqlite3";
-import path from "node:path";
+import { shortsDatabasePath } from "@/lib/config";
 
 /**
  * Reader for the shorts pipeline's SQLite database.
@@ -16,7 +16,7 @@ import path from "node:path";
  * default handle read-only means a bug here can't corrupt the pipeline's data.
  */
 
-const DB_PATH = process.env.SHORTS_DB_PATH?.trim() || path.join(process.cwd(), "data", "shorts.db");
+const DB_PATH = shortsDatabasePath();
 
 /** Where generated clips live, for the media route's path validation. */
 export const SHORTS_OUTPUT_DIR =
