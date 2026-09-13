@@ -137,10 +137,26 @@ only to the three tables it owns (`jobs`, `review`, `lab_state`). WAL mode means
 other.
 
 ```bash
-# In the dashboard's .env.local — both default to sensible places.
+# .env.local — variables for inside the container.
 SHORTS_DB_PATH=/app/data/shorts.db     # already a mounted volume
 SHORTS_OUTPUT_DIR=/srv/shorts_output   # where the clips live
 ```
+
+```bash
+# .env — read by compose itself, to resolve ${...} in docker-compose.yml.
+DASHBOARD_UID=1000                     # id -u
+DASHBOARD_GID=1000                     # id -g
+```
+
+**Two files, and the split is easy to get wrong.** `env_file:` supplies variables to the running
+container. `${...}` substitution in the compose file is resolved by compose *before* the container
+exists, and compose reads only your shell and `.env`. Putting `DASHBOARD_UID` in `.env.local`
+therefore leaves the container on its default uid.
+
+That failure is asymmetric, which is what makes it confusing: reads keep working, so the dashboard
+looks completely healthy, while every write fails with "attempt to write a readonly database" — and
+because the viewer heartbeat is a write, the pipeline quietly pauses for good. `/setup` reports
+writability separately from readability for exactly this reason.
 
 `SHORTS_OUTPUT_DIR` is not optional if you want playback: the media route refuses to serve any file
 outside it.
