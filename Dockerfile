@@ -6,7 +6,11 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 # libc6-compat is needed by sharp's prebuilt binaries on Alpine.
-RUN apk add --no-cache libc6-compat
+#
+# python3/make/g++ are for better-sqlite3, which reads the shorts pipeline's
+# database. Its prebuilt binaries are glibc-only, so on Alpine (musl) it
+# compiles from source — without a toolchain here, `npm ci` fails outright.
+RUN apk add --no-cache libc6-compat python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 
