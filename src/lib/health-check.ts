@@ -4,6 +4,7 @@ import { bazarr } from "@/lib/clients/bazarr";
 import { glances } from "@/lib/clients/glances";
 import { plex } from "@/lib/clients/plex";
 import { radarr } from "@/lib/clients/radarr";
+import { shortsHealth } from "@/lib/clients/shorts";
 import { sonarr } from "@/lib/clients/sonarr";
 import { tautulli } from "@/lib/clients/tautulli";
 import type { Result } from "@/lib/http";
@@ -46,6 +47,9 @@ const ENV_VARS: Record<ServiceId, string[]> = {
   radarr: ["RADARR_URL", "RADARR_API_KEY"],
   bazarr: ["BAZARR_URL", "BAZARR_API_KEY"],
   glances: ["GLANCES_URL"],
+  // A local SQLite file rather than a service. SHORTS_OUTPUT_DIR is what the
+  // media route validates clip paths against before serving them.
+  shorts: ["SHORTS_DB_PATH", "SHORTS_OUTPUT_DIR"],
 };
 
 function toProbe(
@@ -131,6 +135,25 @@ async function probeService(id: ServiceId, label: string, configured: boolean): 
         result.ok ? `API v${glances.apiVersion ?? "?"}` : null,
         result.ok ? `${result.data?.hostname ?? "host"} · ${result.data?.os_name ?? ""}`.trim() : undefined,
       );
+    }
+    case "shorts": {
+      // Not a network service: "reachable" means the SQLite file opens and has
+      // the expected schema. Reported here anyway so /setup lists every source
+      // in one place rather than making this one a special case to remember.
+      const started = Date.now();
+      const health = shortsHealth();
+      return {
+        id,
+        label,
+        configured: true,
+        ok: health.ok,
+        version: health.schemaVersion,
+        detail: health.detail,
+        durationMs: Date.now() - started,
+        kind: health.ok ? undefined : "error",
+        envVars: ENV_VARS[id],
+        baseUrl: null,
+      };
     }
   }
 }

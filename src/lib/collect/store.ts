@@ -29,6 +29,7 @@ function initialState(): DashboardState {
     services: emptySlot(),
     queue: emptySlot(),
     subtitles: emptySlot(),
+    shorts: emptySlot(),
   };
 }
 

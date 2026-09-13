@@ -1,5 +1,7 @@
 import "server-only";
 import type {
+  ShortClip,
+  ShortsState,
   ActivityState,
   HistorySnapshot,
   LibraryItem,
@@ -622,4 +624,74 @@ export function demoHistory(): HistorySnapshot[] {
   }
 
   return snapshots;
+}
+
+/**
+ * Demo shorts.
+ *
+ * Same shape as the real slot, including a paused worker and a couple of
+ * unusable items — a demo where everything succeeds hides the states the panel
+ * actually exists to surface.
+ */
+export function demoShorts(): ShortsState {
+  const now = Date.now();
+  const clip = (
+    index: number,
+    title: string,
+    quote: string,
+    score: number,
+    part?: [number, number],
+  ): ShortClip => ({
+    id: `demo-${index}`,
+    title,
+    show: title.includes("S0") ? "Malcolm in the Middle" : null,
+    lookupKey: title,
+    quote,
+    category: part ? null : "dewey_chaos",
+    start: 600 + index * 420,
+    end: 634 + index * 420,
+    duration: 34,
+    score,
+    output: `/srv/shorts_output/clips/demo-${index}.mp4`,
+    thumbnail: `/srv/shorts_output/thumbs/demo-${index}.jpg`,
+    provenance: index % 3 === 0 ? "whisper_generated" : "text_embedded",
+    seriesId: part ? "demo-series" : null,
+    partIndex: part?.[0] ?? null,
+    partTotal: part?.[1] ?? null,
+    createdAt: new Date(now - index * 3_600_000).toISOString(),
+    reviewStatus: index === 1 ? "approved" : null,
+  });
+
+  return {
+    totals: { clips: 34, series: 6, mediaItems: 412, audited: 412, usable: 361, needsWhisper: 51 },
+    byReason: [
+      { reason: "IMAGE_ONLY", explanation: "only image-based subtitles (PGS/VobSub) — needs OCR", count: 28 },
+      { reason: "NO_SUB_STREAMS", explanation: "no subtitle streams and no sidecar file", count: 17 },
+      { reason: "LOW_COVERAGE_LIKELY_FORCED", explanation: "subtitles stop well before the end", count: 6 },
+    ],
+    byProvenance: [
+      { provenance: "text_embedded", count: 26 },
+      { provenance: "whisper_generated", count: 6 },
+      { provenance: "text_sidecar", count: 2 },
+    ],
+    recentClips: [
+      clip(0, "Heat", "I do what I do best, I take scores.", 94, [1, 4]),
+      clip(1, "Heat", "Never had a cup of coffee with you before.", 88, [2, 4]),
+      clip(2, "Malcolm in the Middle - S01E03 - Home Alone 4", "I am the smartest man alive!", 91),
+      clip(3, "The Empire Strikes Back", "Do or do not. There is no try.", 97),
+    ],
+    jobs: [
+      { id: 41, type: "transcribe", status: "running", progress: 0.4, detail: "chunk 4/10", error: null, createdAt: new Date(now - 240_000).toISOString(), finishedAt: null },
+      { id: 40, type: "render", status: "done", progress: 1, detail: "produced 4 clip(s)", error: null, createdAt: new Date(now - 3_000_000).toISOString(), finishedAt: new Date(now - 2_700_000).toISOString() },
+      { id: 39, type: "audit", status: "done", progress: 1, detail: "audited 412 item(s); 361 usable", error: null, createdAt: new Date(now - 9_000_000).toISOString(), finishedAt: new Date(now - 8_400_000).toISOString() },
+    ],
+    runs: [
+      { id: "a1b2c3", command: "make --multipart", startedAt: new Date(now - 3_000_000).toISOString(), finishedAt: new Date(now - 2_700_000).toISOString(), itemsSeen: 12, produced: 4, skipped: 8, reasons: [{ reason: "NO_SUB_STREAMS", count: 5 }, { reason: "below threshold", count: 3 }], error: null },
+    ],
+    tests: [
+      { id: "t1", suite: "pytest", passed: 103, failed: 0, duration: 10.5, detail: null, createdAt: new Date(now - 600_000).toISOString() },
+    ],
+    worker: { paused: true, reason: "2 streams active", activeStreams: 2, transcodes: 1, heartbeatAgeSeconds: 3 },
+    estWhisperHours: 4.2,
+  };
 }

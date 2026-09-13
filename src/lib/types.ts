@@ -267,6 +267,123 @@ export interface SubtitleState {
   providers: { name: string; status: string; healthy: boolean }[];
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Shorts — the clip pipeline's output
+ * ------------------------------------------------------------------ */
+
+export interface ShortClip {
+  id: string;
+  title: string | null;
+  show: string | null;
+  lookupKey: string;
+  quote: string;
+  category: string | null;
+  /** Seconds into the SOURCE file — useful for finding the moment again. */
+  start: number;
+  end: number;
+  duration: number;
+  /** Fuzzy-match confidence, 0-100. Low scores are worth reviewing first. */
+  score: number;
+  output: string;
+  thumbnail: string | null;
+  /** Which rung of the subtitle ladder produced the timing. */
+  provenance: string | null;
+  seriesId: string | null;
+  partIndex: number | null;
+  partTotal: number | null;
+  createdAt: string;
+  reviewStatus: string | null;
+}
+
+export interface SubtitleAuditRow {
+  path: string;
+  title: string | null;
+  show: string | null;
+  kind: string | null;
+  streamCount: number;
+  codecs: string | null;
+  languages: string | null;
+  forcedStreams: number;
+  sidecars: number;
+  reason: string | null;
+  explanation: string | null;
+  provenance: string | null;
+  cueCount: number | null;
+  coverage: number | null;
+  usable: boolean;
+  needsWhisper: boolean;
+  estMinutes: number | null;
+  checkedAt: string | null;
+}
+
+export interface ShortsJob {
+  id: number;
+  type: string;
+  status: string;
+  progress: number;
+  detail: string | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface ShortsRun {
+  id: string;
+  command: string;
+  startedAt: string;
+  finishedAt: string | null;
+  itemsSeen: number;
+  produced: number;
+  skipped: number;
+  reasons: { reason: string; count: number }[];
+  error: string | null;
+}
+
+export interface ShortsTestRun {
+  id: string;
+  suite: string;
+  passed: number;
+  failed: number;
+  duration: number | null;
+  detail: string | null;
+  createdAt: string;
+}
+
+/**
+ * Whether the pipeline is allowed to work right now.
+ *
+ * Mirrors the worker's own gate logic so the dashboard can say "paused - 2
+ * streams" rather than leaving a queue that looks stuck for no visible reason.
+ */
+export interface ShortsWorkerStatus {
+  paused: boolean;
+  reason: string;
+  activeStreams: number;
+  transcodes: number;
+  heartbeatAgeSeconds: number | null;
+}
+
+export interface ShortsState {
+  totals: {
+    clips: number;
+    series: number;
+    mediaItems: number;
+    audited: number;
+    usable: number;
+    needsWhisper: number;
+  };
+  byReason: { reason: string; explanation: string | null; count: number }[];
+  byProvenance: { provenance: string; count: number }[];
+  /** A handful for the overview. The full list comes from /api/shorts/clips. */
+  recentClips: ShortClip[];
+  jobs: ShortsJob[];
+  runs: ShortsRun[];
+  tests: ShortsTestRun[];
+  worker: ShortsWorkerStatus;
+  estWhisperHours: number;
+}
+
 /* ------------------------------------------------------------------ *
  * The whole dashboard
  * ------------------------------------------------------------------ */
@@ -279,6 +396,7 @@ export interface DashboardState {
   services: Slot<ServicesState>;
   queue: Slot<QueueState>;
   subtitles: Slot<SubtitleState>;
+  shorts: Slot<ShortsState>;
 }
 
 export type SlotKey = keyof DashboardState;

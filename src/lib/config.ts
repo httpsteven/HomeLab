@@ -15,7 +15,8 @@ export type ServiceId =
   | "sonarr"
   | "radarr"
   | "bazarr"
-  | "glances";
+  | "glances"
+  | "shorts";
 
 export interface ServiceConfig {
   id: ServiceId;
@@ -46,6 +47,7 @@ export const SERVICE_LABELS: Record<ServiceId, string> = {
   radarr: "Radarr",
   bazarr: "Bazarr",
   glances: "Glances",
+  shorts: "Shorts",
 };
 
 export function getServiceConfig(id: ServiceId): ServiceConfig {
@@ -57,6 +59,11 @@ export function getServiceConfig(id: ServiceId): ServiceConfig {
     radarr: { url: env.RADARR_URL, key: env.RADARR_API_KEY, requiresKey: true },
     bazarr: { url: env.BAZARR_URL, key: env.BAZARR_API_KEY, requiresKey: true },
     glances: { url: env.GLANCES_URL, key: undefined, requiresKey: false },
+    // Shorts is a local SQLite file, not a network service. It has no URL
+    // and no key; `isConfigured` for it is "does the file exist", which
+    // lives in the client. The entry exists so /setup and /api/diag list it
+    // alongside everything else.
+    shorts: { url: undefined, key: undefined, requiresKey: false },
   };
 
   const entry = map[id];

@@ -1,6 +1,7 @@
 import "server-only";
 import { buildActivityState } from "@/lib/aggregate/activity";
 import { buildLibraryState } from "@/lib/aggregate/library";
+import { buildShortsState } from "@/lib/aggregate/shorts";
 import { buildMachineState } from "@/lib/aggregate/machine";
 import { buildStorageState } from "@/lib/aggregate/storage";
 import {
@@ -13,6 +14,7 @@ import { glances } from "@/lib/clients/glances";
 import { radarr } from "@/lib/clients/radarr";
 import { sonarr } from "@/lib/clients/sonarr";
 import { tautulli } from "@/lib/clients/tautulli";
+import { shortsAvailable } from "@/lib/clients/shorts";
 import type { LibraryState, SlotKey } from "@/lib/types";
 import {
   clientCount,
@@ -32,6 +34,7 @@ import {
   demoServices,
   demoStorage,
   demoSubtitles,
+  demoShorts,
   isDemoMode,
 } from "@/lib/demo";
 
@@ -76,6 +79,7 @@ const DEMO_SOURCES: Record<SlotKey, () => unknown> = {
   subtitles: demoSubtitles,
   library: demoLibraryState,
   storage: () => demoStorage(demoLibraryState()),
+  shorts: demoShorts,
 };
 
 const SOURCES: Source[] = [
@@ -123,6 +127,17 @@ const SOURCES: Source[] = [
     requiresClients: false,
     isConfigured: () => sonarr.available || radarr.available || glances.available,
     run: buildStorageState,
+  },
+  {
+    // 5s: the database is a local file, so this costs nothing upstream. It also
+    // publishes the viewer heartbeat the pipeline's worker reads, which wants
+    // to be reasonably fresh — the worker treats a stale heartbeat as "someone
+    // might be watching" and stops working.
+    key: "shorts",
+    intervalMs: 5_000,
+    requiresClients: false,
+    isConfigured: () => shortsAvailable(),
+    run: buildShortsState,
   },
   {
     key: "library",
