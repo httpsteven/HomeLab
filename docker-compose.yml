@@ -38,7 +38,13 @@ services:
     # WAL mode also creates -wal and -shm files beside it, so both need write
     # access to the DIRECTORY, not just the file.
     #
-    # Set these in .env.local (or export them) to your own id: `id -u`, `id -g`.
+    # These must live in the compose project's `.env` file, or be exported in
+    # your shell — NOT in .env.local. Compose reads `.env` for ${...}
+    # substitution, while `env_file:` below only sets variables inside the
+    # container, so a value in .env.local leaves this line on its default.
+    #
+    #   printf 'DASHBOARD_UID=%s\nDASHBOARD_GID=%s\n' "$(id -u)" "$(id -g)" >> .env
+    #
     # Without this the container runs as uid 1001 and one side or the other gets
     # "attempt to write a readonly database".
     user: "${DASHBOARD_UID:-1001}:${DASHBOARD_GID:-1001}"

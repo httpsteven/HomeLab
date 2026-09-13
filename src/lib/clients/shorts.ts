@@ -119,8 +119,11 @@ function describeWriteFailure(error: unknown): string {
   if (/readonly|SQLITE_READONLY/i.test(message)) {
     return (
       `${message} — the dashboard cannot write ${DB_PATH}. ` +
-      `Set DASHBOARD_UID and DASHBOARD_GID in .env.local to the user that owns ` +
-      `the data directory (id -u / id -g), then recreate the container.`
+      `Put DASHBOARD_UID and DASHBOARD_GID in the compose project's .env file ` +
+      `(NOT .env.local) set to the user owning the data directory, then run ` +
+      `docker compose up -d --force-recreate dashboard. ` +
+      `Compose reads .env for substitution; .env.local only sets variables ` +
+      `inside the container.`
     );
   }
   if (/SQLITE_BUSY/i.test(message)) {
