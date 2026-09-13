@@ -45,9 +45,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const jobId = enqueueJob(type, body.payload ?? {});
-  if (jobId === null) {
-    return Response.json({ error: "Could not queue the job." }, { status: 502 });
+  const { jobId, error } = enqueueJob(type, body.payload ?? {});
+  if (error !== null) {
+    // Report what actually went wrong. A generic "could not queue" is
+    // indistinguishable between a permissions problem, a missing schema and a
+    // lock — and they have completely different fixes.
+    return Response.json({ error }, { status: 502 });
   }
 
   return Response.json({ jobId, error: null }, { status: 202 });

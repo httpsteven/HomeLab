@@ -45,8 +45,16 @@ export async function POST(request: Request) {
 
   // "Always transcribe this one" — no file, just a flag.
   if (form.get("forceWhisper") === "true") {
-    setSubtitleOverride(mediaPath, { forceWhisper: true, note: "forced from dashboard" });
-    enqueueJob("transcribe", { path: mediaPath });
+    const override = setSubtitleOverride(mediaPath, {
+      forceWhisper: true, note: "forced from dashboard",
+    });
+    if (!override.ok) {
+      return Response.json({ error: override.error }, { status: 502 });
+    }
+    const queued = enqueueJob("transcribe", { path: mediaPath });
+    if (queued.error !== null) {
+      return Response.json({ error: queued.error }, { status: 502 });
+    }
     return Response.json({ error: null, queued: "transcribe" }, { status: 202 });
   }
 
@@ -87,7 +95,14 @@ export async function POST(request: Request) {
     );
   }
 
-  setSubtitleOverride(mediaPath, { srtPath: destination, note: `uploaded ${file.name}` });
+  const override = setSubtitleOverride(mediaPath, {
+    srtPath: destination, note: `uploaded ${file.name}`,
+  });
+  if (!override.ok) {
+    // The file is on disk but the pipeline will never look at it, which is
+    // worse than a clean failure — say so rather than reporting success.
+    return Response.json({ error: override.error }, { status: 502 });
+  }
   enqueueJob("audit", { path: mediaPath, deep: true });
 
   return Response.json({ error: null, path: destination }, { status: 201 });

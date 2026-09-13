@@ -99,15 +99,53 @@ export function queryOne<T = unknown>(sql: string, params: unknown[] = []): T | 
   return query<T>(sql, params)[0] ?? null;
 }
 
-export function execute(sql: string, params: unknown[] = []): boolean {
+export interface WriteResult {
+  ok: boolean;
+  error: string | null;
+}
+
+/**
+ * Turn a raw SQLite failure into something that names the fix.
+ *
+ * SQLITE_READONLY is by far the likeliest failure here and the least
+ * self-explanatory: the pipeline and this container both write the database,
+ * so the container has to run as the user that owns the directory. WAL also
+ * creates -wal and -shm files beside the database, which is why write access
+ * to the DIRECTORY matters and not just to the file.
+ */
+function describeWriteFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (/readonly|SQLITE_READONLY/i.test(message)) {
+    return (
+      `${message} — the dashboard cannot write ${DB_PATH}. ` +
+      `Set DASHBOARD_UID and DASHBOARD_GID in .env.local to the user that owns ` +
+      `the data directory (id -u / id -g), then recreate the container.`
+    );
+  }
+  if (/SQLITE_BUSY/i.test(message)) {
+    return `${message} — the pipeline is mid-write; retrying usually clears it.`;
+  }
+  if (/no such table/i.test(message)) {
+    return `${message} — the pipeline has not created its schema yet.`;
+  }
+  return message;
+}
+
+export function execute(sql: string, params: unknown[] = []): WriteResult {
   const db = openWriter();
-  if (!db) return false;
+  if (!db) {
+    return { ok: false, error: `Could not open ${DB_PATH} for writing.` };
+  }
   try {
     db.prepare(sql).run(...(params as never[]));
-    return true;
-  } catch {
-    resetShortsDb();
-    return false;
+    return { ok: true, error: null };
+  } catch (error) {
+    // Only the writer is dropped. Resetting both would take the read
+    // connection down with it and blank the whole page over a failed click.
+    try { writer?.close(); } catch { /* already gone */ }
+    writer = null;
+    return { ok: false, error: describeWriteFailure(error) };
   }
 }
 
@@ -141,21 +179,33 @@ export function writeLabState(activeStreams: number, transcodes: number): void {
   );
 }
 
-export function enqueueJob(type: string, payload: Record<string, unknown>): number | null {
+export interface EnqueueResult {
+  jobId: number | null;
+  error: string | null;
+}
+
+export function enqueueJob(
+  type: string, payload: Record<string, unknown>,
+): EnqueueResult {
   const db = openWriter();
-  if (!db) return null;
+  if (!db) {
+    return { jobId: null, error: `Could not open ${DB_PATH} for writing.` };
+  }
   try {
     const result = db
       .prepare("INSERT INTO jobs (type, payload, created_at) VALUES (?, ?, ?)")
       .run(type, JSON.stringify(payload), new Date().toISOString());
-    return Number(result.lastInsertRowid);
-  } catch {
-    resetShortsDb();
-    return null;
+    return { jobId: Number(result.lastInsertRowid), error: null };
+  } catch (error) {
+    try { writer?.close(); } catch { /* already gone */ }
+    writer = null;
+    return { jobId: null, error: describeWriteFailure(error) };
   }
 }
 
-export function setReview(clipId: string, status: string, note: string | null): boolean {
+export function setReview(
+  clipId: string, status: string, note: string | null,
+): WriteResult {
   return execute(
     `INSERT INTO review (clip_id, status, note, updated_at)
      VALUES (?, ?, ?, ?)
@@ -168,7 +218,7 @@ export function setReview(clipId: string, status: string, note: string | null): 
 export function setSubtitleOverride(
   mediaPath: string,
   options: { srtPath?: string | null; streamIndex?: number | null; forceWhisper?: boolean; note?: string | null },
-): boolean {
+): WriteResult {
   return execute(
     `INSERT INTO subtitle_overrides (path, srt_path, stream_index, force_whisper, note, created_at)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -220,10 +270,47 @@ export function shortsHealth(): ShortsHealth {
     "SELECT COUNT(*) AS n FROM shorts WHERE deleted_at IS NULL",
   );
   const audited = queryOne<{ n: number }>("SELECT COUNT(*) AS n FROM subtitle_audit");
+  const summary = `${clips?.n ?? 0} clip(s), ${audited?.n ?? 0} item(s) audited`;
+
+  // A read-only database looks perfectly healthy until you try to do
+  // something. BEGIN IMMEDIATE takes a write lock without writing anything, so
+  // this fails exactly where a real write would, and changes nothing when it
+  // succeeds. Worth checking here because losing writes also means the viewer
+  // heartbeat stops, which quietly pauses the pipeline for good.
+  const writable = canWrite();
+  if (!writable.ok) {
+    return {
+      ok: false,
+      detail: `Readable but NOT writable — ${writable.error}`,
+      schemaVersion: `schema v${version.value}`,
+    };
+  }
 
   return {
     ok: true,
-    detail: `${clips?.n ?? 0} clip(s), ${audited?.n ?? 0} item(s) audited`,
+    detail: summary,
     schemaVersion: `schema v${version.value}`,
   };
+}
+
+
+/**
+ * Can this process write the database?
+ *
+ * BEGIN IMMEDIATE acquires the write lock without writing anything, so it
+ * fails in exactly the cases a real write would and is a no-op otherwise.
+ */
+export function canWrite(): WriteResult {
+  const db = openWriter();
+  if (!db) {
+    return { ok: false, error: `Could not open ${DB_PATH} for writing.` };
+  }
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    db.exec("ROLLBACK");
+    return { ok: true, error: null };
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch { /* nothing to roll back */ }
+    return { ok: false, error: describeWriteFailure(error) };
+  }
 }

@@ -6,7 +6,6 @@ import { useSlot } from "@/components/DashboardProvider";
 import { ShortCard } from "@/components/shorts/ShortCard";
 import { ShortPlayer } from "@/components/shorts/ShortPlayer";
 import { NotConfigured, Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
-import { InfoNote } from "@/components/ui/Status";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
 import { scoreMatch } from "@/lib/search";
@@ -143,22 +142,43 @@ export function ShortsView() {
     });
 
   async function onReview(clip: ShortClip, status: string) {
+    const previousStatus = clip.reviewStatus;
     markBusy(clip.id, true);
-    // Optimistic: the round trip is local and the failure path restores it.
+
+    // Optimistic, but only until the server disagrees.
     setClips((previous) =>
       previous?.map((entry) =>
         entry.id === clip.id ? { ...entry, reviewStatus: status } : entry,
       ) ?? previous,
     );
+
     try {
-      await fetch("/api/shorts/review", {
+      const response = await fetch("/api/shorts/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clipId: clip.id, status }),
       });
+      const body = await response.json().catch(() => ({ error: null }));
+
+      if (!response.ok || body.error) {
+        // Put it back. Leaving the optimistic value on screen would show a
+        // review state that does not exist, until the next reload silently
+        // undid it.
+        setClips((prev) =>
+          prev?.map((entry) =>
+            entry.id === clip.id
+              ? { ...entry, reviewStatus: previousStatus }
+              : entry,
+          ) ?? prev,
+        );
+        setError(body.error ?? "Could not save that review.");
+        return;
+      }
+      setError(null);
+    } catch {
+      setError("Could not reach the dashboard API.");
     } finally {
       markBusy(clip.id, false);
-      load();
     }
   }
 
@@ -172,14 +192,27 @@ export function ShortsView() {
 
     markBusy(clip.id, true);
     try {
-      await fetch("/api/shorts/job", {
+      const response = await fetch("/api/shorts/job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "delete", payload: { clip_ids: [clip.id] } }),
       });
-      // The worker does the unlinking, so the row lingers until it runs. Hide
-      // it now rather than leaving something that looks like a failed click.
+      const body = await response.json().catch(() => ({ error: null }));
+
+      if (!response.ok || body.error) {
+        // Do NOT hide the clip. Removing it from the grid after a failed
+        // delete makes a broken action look like a successful one, right up
+        // until it reappears on the next refresh.
+        setError(body.error ?? "Could not queue the delete.");
+        return;
+      }
+
+      // Queued, not done: the worker does the unlinking. Hide it now rather
+      // than leaving something that looks like a click that did nothing.
       setClips((previous) => previous?.filter((entry) => entry.id !== clip.id) ?? previous);
+      setError(null);
+    } catch {
+      setError("Could not reach the dashboard API.");
     } finally {
       markBusy(clip.id, false);
     }
@@ -275,7 +308,14 @@ export function ShortsView() {
             />
           </div>
 
-          {error ? <InfoNote>{error}</InfoNote> : null}
+          {error ? (
+            <p
+              role="alert"
+              className="rounded-lg bg-surface-2 px-3 py-2 text-xs leading-relaxed text-critical"
+            >
+              {error}
+            </p>
+          ) : null}
 
           {clips === null ? (
             <p className="py-10 text-center text-sm text-ink-muted">Loading clips…</p>

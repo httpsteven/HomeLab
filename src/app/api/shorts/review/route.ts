@@ -30,8 +30,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const ok = setReview(clipId, status, body.note ?? null);
+  const { ok, error } = setReview(clipId, status, body.note ?? null);
   return ok
     ? Response.json({ error: null })
-    : Response.json({ error: "Could not save." }, { status: 502 });
+    : Response.json({ error }, { status: 502 });
 }
