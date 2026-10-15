@@ -190,11 +190,21 @@ export const ACTIONS: Record<string, Handler> = {
     const result = await runNewsletterIfDue(true);
     if (!result.issue) return { ok: false, message: "Couldn't build an issue." };
     const { counts } = result.issue.shared;
+    // Series are named here too. Reporting only films and episodes meant a
+    // week of intact seasons read back as "7 films, 0 episodes", which is the
+    // same blind spot the issue itself used to have.
+    const summary =
+      [
+        counts.movies > 0 ? `${counts.movies} films` : null,
+        counts.shows > 0 ? `${counts.shows} series` : null,
+        counts.episodes > 0 ? `${counts.episodes} episodes` : null,
+      ]
+        .filter(Boolean)
+        .join(", ") || "nothing new";
+
     return {
       ok: true,
-      message:
-        `Issue ${result.issue.id}: ${counts.movies} films, ${counts.episodes} episodes. ` +
-        result.delivery.join(" "),
+      message: `Issue ${result.issue.id}: ${summary}. ${result.delivery.join(" ")}`,
     };
   },
 
