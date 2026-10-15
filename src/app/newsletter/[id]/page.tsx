@@ -1,6 +1,5 @@
 import { PageHeader } from "@/components/shell/AppShell";
 import { NewsletterView } from "@/components/panels/NewsletterView";
-import { BentoGrid } from "@/components/ui/Panel";
 
 export const metadata = { title: "Newsletter" };
 
@@ -16,9 +15,7 @@ export default async function ArchivedIssuePage({ params }: PageProps<"/newslett
   return (
     <>
       <PageHeader title="Newsletter" description="An issue from the archive." />
-      <BentoGrid>
-        <NewsletterView issueId={id} />
-      </BentoGrid>
+      <NewsletterView issueId={id} />
     </>
   );
 }

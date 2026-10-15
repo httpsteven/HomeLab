@@ -26,6 +26,8 @@ interface ActionButtonProps {
   variant?: "default" | "danger";
   /** Requires a second click, with this text as the confirmation label. */
   confirm?: string;
+  /** Fired after a successful run, for callers that need to refetch. */
+  onDone?: () => void;
   className?: string;
 }
 
@@ -37,6 +39,7 @@ export function ActionButton({
   size = "sm",
   variant = "default",
   confirm,
+  onDone,
   className,
 }: ActionButtonProps) {
   const [state, setState] = useState<State>("idle");
@@ -67,6 +70,7 @@ export function ActionButton({
       setMessage(result.message);
 
       if (result.ok) {
+        onDone?.();
         setTimeout(() => {
           setState("idle");
           setMessage(null);

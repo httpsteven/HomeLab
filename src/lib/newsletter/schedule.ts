@@ -64,7 +64,7 @@ export async function runNewsletterIfDue(force = false): Promise<RunOutcome> {
   const issue = await buildIssue();
   await saveIssue(issue);
 
-  const config = mailConfig();
+  const config = await mailConfig();
   const delivery: string[] = [];
 
   // Generated issues are always archived and visible on the dashboard; only

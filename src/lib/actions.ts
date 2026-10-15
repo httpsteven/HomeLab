@@ -10,6 +10,7 @@ import { sendTestAlert } from "@/lib/alerts";
 import { runNewsletterIfDue } from "@/lib/newsletter/schedule";
 import { sendIssue } from "@/lib/newsletter/send";
 import { latestIssue } from "@/lib/newsletter/store";
+import { writeMailSettings } from "@/lib/settings";
 import type { ArrClient } from "@/lib/clients/arr";
 
 /**
@@ -208,6 +209,59 @@ export const ACTIONS: Record<string, Handler> = {
 
     const result = await sendIssue(issue, edition, [to]);
     return { ok: result.ok, message: result.message };
+  },
+
+  /* --- Settings ----------------------------------------------------- */
+  /**
+   * Saves mail settings.
+   *
+   * Writes a config file, nothing else — it cannot touch media. The password
+   * only travels inbound: an omitted `pass` keeps whatever is stored, so the
+   * form never has to receive a secret in order to re-save the other fields.
+   */
+  "settings.mail": async ({ params }) => {
+    const text = (key: string): string | null | undefined => {
+      const value = params[key];
+      if (value === undefined) return undefined;
+      if (typeof value !== "string") return undefined;
+      const trimmed = value.trim();
+      return trimmed === "" ? null : trimmed;
+    };
+
+    const from = text("from");
+    const host = text("host");
+    if (from && !from.includes("@")) throw new Error('"from" must be an email address');
+
+    let port: number | null | undefined;
+    if (params.port !== undefined) {
+      const parsed = Number(params.port);
+      if (params.port === "" || params.port === null) port = null;
+      else if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+        throw new Error('"port" must be between 1 and 65535');
+      } else port = parsed;
+    }
+
+    await writeMailSettings({
+      host,
+      port,
+      user: text("user"),
+      // Only overwritten when a non-empty value is supplied.
+      ...(typeof params.pass === "string" && params.pass.trim() !== ""
+        ? { pass: params.pass.trim() }
+        : {}),
+      from,
+      viewerRecipients: text("viewerRecipients"),
+      adminRecipients: text("adminRecipients"),
+      ...(params.enabled !== undefined ? { enabled: Boolean(params.enabled) } : {}),
+      ...(params.secure !== undefined ? { secure: Boolean(params.secure) } : {}),
+    });
+
+    return {
+      ok: true,
+      message: host
+        ? "Saved. Send a test to confirm it works."
+        : "Saved. Set a host before anything can send.",
+    };
   },
 
   /* --- Plex --------------------------------------------------------- */

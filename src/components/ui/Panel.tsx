@@ -82,8 +82,14 @@ export function PanelHeader({ title, meta, icon, action, className }: PanelHeade
       )}
     >
       {icon ? <span className="text-ink-muted shrink-0">{icon}</span> : null}
-      <h2 className="label-muted truncate">{title}</h2>
-      {meta ? <span className="metric text-[11px] text-ink-faint shrink-0">{meta}</span> : null}
+      {/* The meta gives way before the title does. Both shrink-0 and a narrow
+          header meant "New this week · Oct 7 – Oct 14 · Rebuild" collapsed the
+          title to "NEW …" on a phone, which loses the one word that says what
+          the tile is. The cap keeps a long title from doing the reverse. */}
+      <h2 className="label-muted max-w-[60%] shrink-0 truncate">{title}</h2>
+      {meta ? (
+        <span className="metric min-w-0 truncate text-[11px] text-ink-faint">{meta}</span>
+      ) : null}
       {action ? <div className="ml-auto shrink-0">{action}</div> : null}
     </header>
   );

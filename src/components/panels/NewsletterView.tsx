@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Mail, Send, Sparkles } from "lucide-react";
+import { ExternalLink, Mail, Send, Sparkles } from "lucide-react";
 import { ActionButton } from "@/components/ui/ActionButton";
-import { NotConfigured, Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
+import { MailSettings } from "@/components/panels/MailSettings";
+import {
+  BentoColumns,
+  NotConfigured,
+  Panel,
+  PanelBody,
+  PanelHeader,
+} from "@/components/ui/Panel";
 import { InfoNote, StatusBadge } from "@/components/ui/Status";
 import { formatBytes, formatDate, formatNumber } from "@/lib/format";
 import type { AddedItem, Issue, IssueSummary } from "@/lib/newsletter/types";
@@ -15,6 +22,12 @@ import type { AddedItem, Issue, IssueSummary } from "@/lib/newsletter/types";
  * Renders the ADMIN view — this is the dashboard, behind whatever protects
  * it. The viewer edition is what goes out by mail, and the split lives in the
  * issue model rather than in a flag here.
+ *
+ * Two deliberate columns rather than a wrapping grid, for the reason the
+ * overview page gives: the issue is one very tall tile and everything beside
+ * it is short, so a row-based layout leaves the entire right side empty below
+ * Delivery. The split is by subject — the left column is the issue itself, the
+ * right is everything that governs where it goes.
  */
 
 interface Payload {
@@ -55,19 +68,17 @@ function Poster({ item }: { item: AddedItem }) {
 export function NewsletterView({ issueId }: { issueId?: string }) {
   const [data, setData] = useState<Payload | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
     const query = issueId ? `?id=${encodeURIComponent(issueId)}` : "";
-    fetch(`/api/newsletter${query}`)
+    return fetch(`/api/newsletter${query}`)
       .then((response) => response.json())
-      .then((payload: Payload) => {
-        if (!cancelled) setData(payload);
-      })
+      .then((payload: Payload) => setData(payload))
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
   }, [issueId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (!data) {
     return (
@@ -81,157 +92,189 @@ export function NewsletterView({ issueId }: { issueId?: string }) {
 
   const { issue, archive, mail } = data;
 
+  // No issue yet still shows the settings — this is exactly when you want to
+  // fill them in.
   if (!issue) {
     return (
-      <Panel span="full">
-        <PanelHeader title="No issues yet" icon={<Mail size={13} />} />
-        <PanelBody className="flex flex-col items-start gap-3">
-          <p className="max-w-prose text-sm leading-relaxed text-ink-muted">
-            An issue is generated once a week. Build one now to see what it looks like —
-            nothing is emailed unless you&apos;ve turned sending on.
-          </p>
-          <ActionButton
-            action="newsletter.generate"
-            label="Generate an issue"
-            icon={<Sparkles size={12} aria-hidden />}
-          />
-        </PanelBody>
-      </Panel>
+      <BentoColumns
+        primary={
+          <Panel>
+            <PanelHeader title="No issues yet" icon={<Mail size={13} />} />
+            <PanelBody className="flex flex-col items-start gap-3">
+              <p className="max-w-prose text-sm leading-relaxed text-ink-muted">
+                An issue is generated once a week. Build one now to see what it looks
+                like — nothing is emailed unless you&apos;ve turned sending on.
+              </p>
+              <ActionButton
+                action="newsletter.generate"
+                label="Generate an issue"
+                icon={<Sparkles size={12} aria-hidden />}
+                onDone={load}
+              />
+            </PanelBody>
+          </Panel>
+        }
+        secondary={<MailSettings onSaved={load} />}
+      />
     );
   }
 
   const { shared, admin } = issue;
+  const issueQuery = issueId ? `&id=${encodeURIComponent(issueId)}` : "";
 
   return (
-    <>
-      {/* --- The issue itself ------------------------------------------ */}
-      <Panel span="xl">
-        <PanelHeader
-          title="New this week"
-          meta={`${formatDate(issue.from)} – ${formatDate(issue.to)}`}
-          icon={<Mail size={13} />}
-          action={
-            <ActionButton
-              action="newsletter.generate"
-              label="Rebuild"
-              size="xs"
-              icon={<Sparkles size={10} aria-hidden />}
-            />
-          }
-        />
-        <PanelBody className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: "Films", value: shared.counts.movies },
-              { label: "Episodes", value: shared.counts.episodes },
-              { label: "Shows", value: shared.counts.shows },
-              { label: "Plays", value: shared.totalPlays },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-lg bg-surface-2 px-3 py-2">
-                <p className="metric text-lg leading-none font-semibold text-ink">
-                  {formatNumber(stat.value)}
-                </p>
-                <p className="label-muted mt-1">{stat.label}</p>
-              </div>
-            ))}
-            {admin.bytesAdded !== null ? (
-              <div className="rounded-lg bg-surface-2 px-3 py-2">
-                <p className="metric text-lg leading-none font-semibold text-ink">
-                  +{formatBytes(admin.bytesAdded)}
-                </p>
-                <p className="label-muted mt-1">Added</p>
-              </div>
-            ) : null}
-          </div>
-
-          {shared.added.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink-muted">Nothing new this week.</p>
-          ) : (
-            <ul className="flex flex-col gap-2.5">
-              {shared.added.slice(0, 20).map((item) => (
-                <li key={item.key} className="flex gap-3 rounded-xl bg-surface-2 p-3">
-                  <Poster item={item} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
-                    <p className="metric mt-0.5 text-[11px] text-ink-faint">
-                      {[item.subtitle, item.kind === "show" ? "TV" : "Film"]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                    {item.summary ? (
-                      <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-ink-muted">
-                        {item.summary}
-                      </p>
-                    ) : null}
-                  </div>
-                </li>
+    <BentoColumns
+      primary={
+        <Panel>
+          <PanelHeader
+            title="New this week"
+            meta={`${formatDate(issue.from)} – ${formatDate(issue.to)}`}
+            icon={<Mail size={13} />}
+            action={
+              <ActionButton
+                action="newsletter.generate"
+                label="Rebuild"
+                size="xs"
+                icon={<Sparkles size={10} aria-hidden />}
+                onDone={load}
+              />
+            }
+          />
+          <PanelBody className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "Films", value: shared.counts.movies },
+                { label: "Episodes", value: shared.counts.episodes },
+                { label: "Shows", value: shared.counts.shows },
+                { label: "Plays", value: shared.totalPlays },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-lg bg-surface-2 px-3 py-2">
+                  <p className="metric text-lg leading-none font-semibold text-ink">
+                    {formatNumber(stat.value)}
+                  </p>
+                  <p className="label-muted mt-1">{stat.label}</p>
+                </div>
               ))}
-            </ul>
-          )}
-        </PanelBody>
-      </Panel>
-
-      {/* --- Delivery -------------------------------------------------- */}
-      <Panel span="md">
-        <PanelHeader title="Delivery" icon={<Send size={13} />} />
-        <PanelBody className="flex flex-col gap-3">
-          {!mail.configured ? (
-            <NotConfigured
-              service="SMTP"
-              hint="Set SMTP_HOST, SMTP_FROM and the credentials to mail issues out."
-            />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge
-                  level={mail.enabled ? "good" : "unknown"}
-                  label={mail.enabled ? "Sending on" : "Sending off"}
-                  compact
-                />
-                <span className="metric text-[11px] text-ink-faint">
-                  {mail.viewerRecipients} viewer · {mail.adminRecipients} admin
-                </span>
-              </div>
-
-              {!mail.enabled ? (
-                <InfoNote>
-                  Issues are generated and archived, but nothing is emailed until
-                  <code className="metric"> NEWSLETTER_ENABLED=1</code>. Read a couple here
-                  first — this is the one feature whose mistakes land in other people&apos;s
-                  inboxes.
-                </InfoNote>
+              {admin.bytesAdded !== null ? (
+                <div className="rounded-lg bg-surface-2 px-3 py-2">
+                  <p className="metric text-lg leading-none font-semibold text-ink">
+                    +{formatBytes(admin.bytesAdded)}
+                  </p>
+                  <p className="label-muted mt-1">Added</p>
+                </div>
               ) : null}
+            </div>
 
-              <TestSend />
-            </>
-          )}
-        </PanelBody>
-      </Panel>
-
-      {/* --- Archive --------------------------------------------------- */}
-      {archive.length > 0 ? (
-        <Panel span="md">
-          <PanelHeader title="Archive" meta={`${archive.length}`} />
-          <PanelBody>
-            <ul className="flex flex-col gap-1">
-              {archive.slice(0, 12).map((entry) => (
-                <li key={entry.id}>
-                  <Link
-                    href={`/newsletter/${entry.id}`}
-                    className="flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-surface-2"
-                  >
-                    <span className="text-ink-secondary">{formatDate(entry.to)}</span>
-                    <span className="metric text-[11px] text-ink-faint">
-                      {entry.movies} films · {entry.episodes} eps
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {shared.added.length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-muted">Nothing new this week.</p>
+            ) : (
+              <ul className="flex flex-col gap-2.5">
+                {shared.added.slice(0, 20).map((item) => (
+                  <li key={item.key} className="flex gap-3 rounded-xl bg-surface-2 p-3">
+                    <Poster item={item} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
+                      <p className="metric mt-0.5 text-[11px] text-ink-faint">
+                        {[item.subtitle, item.kind === "show" ? "TV" : "Film"]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                      {item.summary ? (
+                        <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-ink-muted">
+                          {item.summary}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </PanelBody>
         </Panel>
-      ) : null}
-    </>
+      }
+      secondary={
+        <>
+          {/* --- Delivery ---------------------------------------------- */}
+          <Panel>
+            <PanelHeader title="Delivery" icon={<Send size={13} />} />
+            <PanelBody className="flex flex-col gap-3">
+              {!mail.configured ? (
+                <NotConfigured
+                  service="SMTP"
+                  hint="Fill in the email settings below to mail issues out."
+                />
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge
+                      level={mail.enabled ? "good" : "unknown"}
+                      label={mail.enabled ? "Sending on" : "Sending off"}
+                      compact
+                    />
+                    <span className="metric text-[11px] text-ink-faint">
+                      {mail.viewerRecipients} viewer · {mail.adminRecipients} admin
+                    </span>
+                  </div>
+
+                  {!mail.enabled ? (
+                    <InfoNote>
+                      Issues are generated and archived, but nothing is emailed until you
+                      turn sending on below. Read a couple here first — this is the one
+                      feature whose mistakes land in other people&apos;s inboxes.
+                    </InfoNote>
+                  ) : null}
+
+                  <TestSend />
+                </>
+              )}
+
+              {/* Opens the real email renderer, not a lookalike. */}
+              <div className="flex flex-wrap gap-3 border-t border-[var(--glass-border)] pt-3">
+                {(["admin", "viewer"] as const).map((edition) => (
+                  <a
+                    key={edition}
+                    href={`/api/newsletter/preview?edition=${edition}${issueQuery}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-ink-muted transition-colors hover:text-ink"
+                  >
+                    <ExternalLink size={10} aria-hidden />
+                    Preview {edition} email
+                  </a>
+                ))}
+              </div>
+            </PanelBody>
+          </Panel>
+
+          {/* --- Settings ---------------------------------------------- */}
+          <MailSettings onSaved={load} />
+
+          {/* --- Archive ----------------------------------------------- */}
+          {archive.length > 0 ? (
+            <Panel>
+              <PanelHeader title="Archive" meta={`${archive.length}`} />
+              <PanelBody>
+                <ul className="flex flex-col gap-1">
+                  {archive.slice(0, 12).map((entry) => (
+                    <li key={entry.id}>
+                      <Link
+                        href={`/newsletter/${entry.id}`}
+                        className="flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-surface-2"
+                      >
+                        <span className="text-ink-secondary">{formatDate(entry.to)}</span>
+                        <span className="metric text-[11px] text-ink-faint">
+                          {entry.movies} films · {entry.episodes} eps
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </PanelBody>
+            </Panel>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 

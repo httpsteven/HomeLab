@@ -1,4 +1,9 @@
-import { proxyPosterSrc, renderIssueHtml, renderIssueText } from "@/lib/newsletter/email";
+import {
+  BANNER_URL,
+  proxyPosterSrc,
+  renderIssueHtml,
+  renderIssueText,
+} from "@/lib/newsletter/email";
 import { latestIssue, loadIssue } from "@/lib/newsletter/store";
 import type { Edition } from "@/lib/newsletter/types";
 
@@ -35,7 +40,13 @@ export async function GET(request: Request) {
     });
   }
 
-  return new Response(renderIssueHtml(issue, edition, proxyPosterSrc, null), {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-  });
+  return new Response(
+    renderIssueHtml(issue, edition, {
+      posterSrc: proxyPosterSrc,
+      dashboardUrl: null,
+      // The preview loads it over HTTP; a real send attaches it.
+      bannerSrc: BANNER_URL,
+    }),
+    { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } },
+  );
 }

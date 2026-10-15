@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   const issue = id ? await loadIssue(id) : await latestIssue();
-  const config = mailConfig();
+  const config = await mailConfig();
 
   return Response.json(
     {

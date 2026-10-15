@@ -334,6 +334,20 @@ Read it at `/newsletter`, and preview exactly what will be mailed —
 `/api/newsletter/preview?edition=viewer` renders through the same renderer the
 mailer uses, so the preview can't drift from the real thing.
 
+### Configuring mail
+
+The Email settings panel on `/newsletter` edits all of it from the browser and
+saves to `data/settings.json` (written `0600`), which beats three container
+rebuilds to discover a port was wrong. **A value saved there wins over the
+matching environment variable**, and the form labels any field the environment
+also defines so the override is visible rather than mysterious.
+
+The password is write-only: no endpoint returns it, not even masked, and
+leaving the field blank keeps the stored one. The dashboard has no login, so
+keep it on the tailnet now that it holds a credential.
+
+The same settings as environment variables, if you'd rather declare them:
+
 ```bash
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -346,7 +360,8 @@ NEWSLETTER_ADMIN_RECIPIENTS=you@example.com
 NEWSLETTER_ENABLED=1
 ```
 
-**Sending stays off until `NEWSLETTER_ENABLED=1`.** Issues still generate and
+**Sending stays off until you turn it on** (the Send weekly toggle, or
+`NEWSLETTER_ENABLED=1`). Issues still generate and
 archive, so you can read a few first — this is the one feature whose mistakes
 land in someone else's inbox. The Delivery panel has a test send that goes to
 one address you type, never to the configured lists.
@@ -357,6 +372,13 @@ Two things worth knowing about how it's built:
   object has `shared` and `admin` halves and the viewer edition never reads the
   second, so there's no rule anyone has to remember in order to keep disk paths
   out of a friend's email.
+- **The email is dark on purpose.** Gmail and Outlook auto-invert a light
+  email on a dark phone, and their inversion is a blunt channel flip that
+  wrecks poster art. Shipping dark means most clients leave it alone.
+- **The masthead is a PNG**, because mail clients render neither a gradient nor
+  a web font. Regenerate it with `node scripts/make-banner.mjs`, or just drop
+  your own artwork at `public/newsletter/banner.png` — nothing reads the script
+  at runtime.
 - **Posters are attached, not linked.** The image proxy lives behind Tailscale,
   so a linked poster is a broken image for anyone off the tailnet. They're
   fetched server-side, resized, and embedded — which also means they display
