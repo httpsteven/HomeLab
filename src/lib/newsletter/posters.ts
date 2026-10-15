@@ -16,9 +16,14 @@ import type { AddedItem } from "./types";
  * them would make a multi-megabyte email that some providers silently clip.
  */
 
-/** Width in the email layout is 110px; 2x for retina, and no larger. */
-const POSTER_WIDTH = 220;
-const MAX_POSTERS = 12;
+/** Width in the email layout is 68px; a bit over 2x for retina, no larger. */
+const POSTER_WIDTH = 160;
+/**
+ * Has to cover everything the renderer draws, or later cards fall back to
+ * lettered tiles mid-grid, which reads as breakage rather than as a limit.
+ * Two sections of twelve, matching the cap in email.ts.
+ */
+const MAX_POSTERS = 24;
 const FETCH_TIMEOUT_MS = 8_000;
 
 export interface InlinePoster {

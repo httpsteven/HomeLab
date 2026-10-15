@@ -324,6 +324,21 @@ about a full disk roughly 30,000 times a day, so:
 
 ---
 
+### What counts as an outage
+
+Only Plex raises an unreachable alert. It's the one service whose absence
+anybody notices — if Plex is down nobody can watch anything. Sonarr, Radarr
+and Bazarr automate acquisition, which on a rip-based library is a convenience
+rather than the service itself, and Tautulli and Glances only observe. A
+restart of any of those would have produced an alert that needs no action, and
+alerts that need no action are how people learn to ignore alerts.
+
+Everything still shows its real status on the Health page; this governs who
+gets woken up. Widen it with `ALERT_SERVICES=plex,sonarr`, or switch it off
+with `ALERT_SERVICES=none`. The weekly admin issue uses the same rule, so
+"needs attention" means one thing rather than two.
+
+
 ## Newsletter
 
 A weekly digest in two editions: **viewer** ("new on the server", posters and

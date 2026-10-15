@@ -138,3 +138,31 @@ export const CAPACITY_THRESHOLDS = {
   warning: 0.8,
   critical: 0.9,
 } as const;
+
+/**
+ * Which services are worth waking someone for when they stop responding.
+ *
+ * Plex only, by default, because it is the only one whose absence anybody
+ * notices: if Plex is down nobody can watch anything. Sonarr, Radarr and
+ * Bazarr automate acquisition, which on a rip-based library is a convenience
+ * rather than the service itself — and Tautulli and Glances only observe. A
+ * restart of any of those produces an alert that needs no action, and alerts
+ * that need no action are how people learn to ignore alerts.
+ *
+ * They all still appear on the Health page with their real status. This
+ * governs who gets woken up, not what gets shown.
+ *
+ * Override with ALERT_SERVICES=plex,sonarr — or ALERT_SERVICES=none to stop
+ * unreachability alerting entirely.
+ */
+export function alertingServices(): Set<string> {
+  const raw = process.env.ALERT_SERVICES?.trim();
+  if (!raw) return new Set(["plex"]);
+  if (raw.toLowerCase() === "none") return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((id) => id.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}

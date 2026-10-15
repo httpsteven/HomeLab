@@ -26,6 +26,12 @@ export interface AddedItem {
   addedAt: number;
   /** Episodes rolled into this entry, for shows. */
   episodeCount: number;
+  /** Runtime in whole minutes, films only — a show's is per-episode noise. */
+  runtimeMinutes: number | null;
+  /** At most three; the fourth never earned its line. */
+  genres: string[];
+  /** "PG-13", "TV-MA". Null when Plex has none. */
+  contentRating: string | null;
 }
 
 export interface WatchRow {

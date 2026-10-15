@@ -1,6 +1,7 @@
 import "server-only";
 import { tautulli, type RecentlyAddedItem } from "@/lib/clients/tautulli";
 import { getState } from "@/lib/collect/store";
+import { alertingServices } from "@/lib/config";
 import { readHistory } from "@/lib/history";
 import { demoNewsletter, isDemoMode } from "@/lib/demo";
 import type { AddedItem, Issue, WatchRow } from "./types";
@@ -26,6 +27,19 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
  * and every newly added show went in the bin; only episodes, which do carry a
  * grandparent, survived.
  */
+function genres(item: RecentlyAddedItem): string[] {
+  // Three is the point where chips stop labelling and start decorating.
+  return (item.genres ?? []).map((g) => g.trim()).filter(Boolean).slice(0, 3);
+}
+
+/** Tautulli reports duration in milliseconds, as a string. */
+function runtimeMinutes(item: RecentlyAddedItem): number | null {
+  const ms = Number(item.duration);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const minutes = Math.round(ms / 60_000);
+  return minutes > 0 ? minutes : null;
+}
+
 function text(...values: (string | undefined)[]): string | undefined {
   for (const value of values) {
     const trimmed = value?.trim();
@@ -74,6 +88,9 @@ function groupAdded(items: RecentlyAddedItem[], since: number): AddedItem[] {
         thumb: text(item.thumb) ?? null,
         addedAt,
         episodeCount: 0,
+        runtimeMinutes: runtimeMinutes(item),
+        genres: genres(item),
+        contentRating: text(item.content_rating) ?? null,
       });
       continue;
     }
@@ -108,6 +125,10 @@ function groupAdded(items: RecentlyAddedItem[], since: number): AddedItem[] {
         thumb,
         addedAt,
         episodeCount: 0,
+        // Per-episode runtime on a series is noise, so it's left off.
+        runtimeMinutes: null,
+        genres: genres(item),
+        contentRating: text(item.content_rating) ?? null,
         seasons: new Set<string>(),
         isNew: false,
       } satisfies ShowAccumulator);
@@ -117,6 +138,9 @@ function groupAdded(items: RecentlyAddedItem[], since: number): AddedItem[] {
       entry.addedAt = Math.max(entry.addedAt, addedAt);
       entry.thumb ??= thumb;
       entry.summary ??= text(item.summary) ?? null;
+      entry.contentRating ??= text(item.content_rating) ?? null;
+      // A season often carries none; the show it belongs to does.
+      if (entry.genres.length === 0) entry.genres = genres(item);
     }
 
     if (item.media_type === "episode") entry.episodeCount += 1;
@@ -253,8 +277,16 @@ export async function buildIssue(windowMs = WEEK_MS): Promise<Issue> {
           message: issue.message,
         })),
       ),
+      // Same rule the alerting uses, so "needs attention" means one thing in
+      // this project rather than two. A Bazarr that was restarting when the
+      // issue was generated is not something to read about on a Sunday.
       servicesDown: services
-        .filter((service) => service.configured && !service.reachable)
+        .filter(
+          (service) =>
+            service.configured &&
+            !service.reachable &&
+            alertingServices().has(service.id.toLowerCase()),
+        )
         .map((service) => service.label),
     },
   };

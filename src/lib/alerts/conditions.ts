@@ -1,5 +1,5 @@
 import "server-only";
-import { CAPACITY_THRESHOLDS } from "@/lib/config";
+import { CAPACITY_THRESHOLDS, alertingServices } from "@/lib/config";
 import { formatBytes, formatPercent } from "@/lib/format";
 import type { DashboardState } from "@/lib/types";
 
@@ -123,11 +123,17 @@ export function deriveConditions(
     }
   }
 
-  /* --- Services ------------------------------------------------------ */
+  /* --- Services ------------------------------------------------------
+     Only the services listed in ALERT_SERVICES — Plex alone by default.
+     Everything else still shows its true status on the Health page; it just
+     doesn't send anyone a notification, because an alert nobody acts on
+     teaches them to ignore the ones that matter. */
   const services = state.services.data;
   if (services) {
+    const alerting = alertingServices();
     for (const service of services.services) {
       if (!service.configured || service.reachable) continue;
+      if (!alerting.has(service.id.toLowerCase())) continue;
       conditions.push({
         key: `service-down:${service.id}`,
         level: "critical",

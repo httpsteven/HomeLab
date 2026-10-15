@@ -120,6 +120,9 @@ export function demoNewsletter(from: number, to: number): {
     thumb: null,
     addedAt: to - Math.floor(random() * span),
     episodeCount: 0,
+    runtimeMinutes: 90 + Math.floor(random() * 60),
+    genres: ["Drama", "Thriller"],
+    contentRating: "PG-13",
   }));
 
   const shows = SERIES_TITLES.slice(0, 3).map((title, index) => {
@@ -134,6 +137,9 @@ export function demoNewsletter(from: number, to: number): {
       thumb: null,
       addedAt: to - Math.floor(random() * span),
       episodeCount: episodes,
+      runtimeMinutes: null,
+      genres: ["Comedy"],
+      contentRating: "TV-MA",
     };
   });
 

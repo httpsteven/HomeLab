@@ -125,6 +125,10 @@ export interface RecentlyAddedItem {
   parent_media_index?: string;
   media_index?: string;
   library_name?: string;
+  /** Milliseconds. Per-episode on a show, so only meaningful for films. */
+  duration?: string;
+  genres?: string[];
+  content_rating?: string;
 }
 
 export interface PlaysByDate {
