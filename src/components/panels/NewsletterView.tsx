@@ -145,7 +145,7 @@ export function NewsletterView({ issueId }: { issueId?: string }) {
               {[
                 { label: "Films", value: shared.counts.movies },
                 { label: "Episodes", value: shared.counts.episodes },
-                { label: "Shows", value: shared.counts.shows },
+                { label: "Series", value: shared.counts.shows },
                 { label: "Plays", value: shared.totalPlays },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-lg bg-surface-2 px-3 py-2">

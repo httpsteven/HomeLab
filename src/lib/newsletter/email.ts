@@ -203,9 +203,15 @@ export function renderIssueHtml(
   const { posterSrc, dashboardUrl, bannerSrc } = options;
   const { shared, admin } = issue;
 
+  // Series belong here as much as films do. Counting only episodes hid a
+  // whole week of television whenever seasons arrived intact, which is what a
+  // box-set rip looks like — the headline read "7 films" beside four new shows.
   const headline = [
     shared.counts.movies > 0
       ? `${shared.counts.movies} ${shared.counts.movies === 1 ? "film" : "films"}`
+      : null,
+    shared.counts.shows > 0
+      ? `${shared.counts.shows} ${shared.counts.shows === 1 ? "series" : "series"}`
       : null,
     shared.counts.episodes > 0
       ? `${shared.counts.episodes} ${shared.counts.episodes === 1 ? "episode" : "episodes"}`
@@ -214,20 +220,26 @@ export function renderIssueHtml(
     .filter(Boolean)
     .join(" · ");
 
+  // Empty figures are left out rather than shown as zero, and the strip is
+  // capped at four: these are fixed-width columns, and a fifth makes
+  // "+1014.27 GB" overflow its cell on a 600px email. Space added isn't here
+  // because the admin edition already reports it in The numbers.
   const stats = [
     shared.counts.movies > 0
       ? { value: formatNumber(shared.counts.movies), label: "Films" }
       : null,
+    shared.counts.shows > 0
+      ? { value: formatNumber(shared.counts.shows), label: "Series" }
+      : null,
     shared.counts.episodes > 0
       ? { value: formatNumber(shared.counts.episodes), label: "Episodes" }
       : null,
-    { value: formatNumber(shared.totalPlays), label: "Plays" },
-    // Space added is an admin figure: it says what the library costs, which is
-    // the operator's business and not a viewer's.
-    edition === "admin" && admin.bytesAdded !== null
-      ? { value: `+${formatBytes(admin.bytesAdded)}`, label: "Added" }
+    shared.totalPlays > 0
+      ? { value: formatNumber(shared.totalPlays), label: "Plays" }
       : null,
-  ].filter((entry): entry is { value: string; label: string } => entry !== null);
+  ]
+    .filter((entry): entry is { value: string; label: string } => entry !== null)
+    .slice(0, 4);
 
   const body: string[] = [statStrip(stats)];
 
