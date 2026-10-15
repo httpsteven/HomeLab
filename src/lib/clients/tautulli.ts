@@ -107,6 +107,26 @@ export interface HomeStat {
   rows: HomeStatRow[];
 }
 
+export interface RecentlyAddedItem {
+  rating_key: string;
+  parent_rating_key?: string;
+  grandparent_rating_key?: string;
+  media_type: "movie" | "show" | "season" | "episode";
+  title: string;
+  parent_title?: string;
+  grandparent_title?: string;
+  year?: string;
+  added_at: string;
+  thumb?: string;
+  parent_thumb?: string;
+  grandparent_thumb?: string;
+  summary?: string;
+  /** Season/episode numbers, present on episodes. */
+  parent_media_index?: string;
+  media_index?: string;
+  library_name?: string;
+}
+
 export interface PlaysByDate {
   categories: string[];
   series: { name: string; data: number[] }[];
@@ -176,6 +196,22 @@ class TautulliClient {
     return this.call<{ total_file_size: number; recordsTotal: number }>("get_library_media_info", {
       section_id: sectionId,
       length: 1,
+    });
+  }
+
+  /**
+   * Recently added, as Plex itself understands it.
+   *
+   * The reason this exists rather than reading `added` off Sonarr's series
+   * list: a show added three years ago that got a new season last night is NOT
+   * recently added by that measure, but it is exactly what belongs in a
+   * newsletter. Tautulli returns the episodes and groups them under their
+   * show, which is the behaviour Tautulli's own newsletter relies on.
+   */
+  recentlyAdded(count = 50, mediaType?: "movie" | "show" | "episode") {
+    return this.call<{ recently_added: RecentlyAddedItem[] }>("get_recently_added", {
+      count,
+      media_type: mediaType,
     });
   }
 

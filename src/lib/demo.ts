@@ -13,6 +13,7 @@ import type {
   StorageState,
   SubtitleState,
 } from "./types";
+import type { AddedItem as NewsletterAddedItem } from "./newsletter/types";
 
 /**
  * Demo mode — set DEMO_MODE=1 in .env.local.
@@ -90,6 +91,75 @@ function stableYear(pool: string[], index: number, from: number, to: number): nu
 }
 
 /* ------------------------------------------------------------------ */
+
+/**
+ * Newsletter fixture.
+ *
+ * Demo mode exists so behaviour can be reviewed before it matters, and a
+ * newsletter is the clearest case of that: its mistakes arrive in other
+ * people's inboxes. Without this the page and the email render empty in demo
+ * and prove nothing.
+ */
+export function demoNewsletter(from: number, to: number): {
+  added: NewsletterAddedItem[];
+  topTitles: { label: string; plays: number }[];
+  topUsers: { label: string; plays: number }[];
+  playsByDay: { date: string; plays: number }[];
+} {
+  const random = seeded(99);
+  const span = Math.max(to - from, 86400000);
+
+  const films = MOVIE_TITLES.slice(0, 5).map((title, index) => ({
+    key: `demo-movie-${index}`,
+    kind: "movie" as const,
+    title,
+    subtitle: String(stableYear(MOVIE_TITLES, index, 1975, 2024)),
+    year: stableYear(MOVIE_TITLES, index, 1975, 2024),
+    summary:
+      "A placeholder synopsis, long enough to show how a real one wraps inside the layout without running away with the row.",
+    thumb: null,
+    addedAt: to - Math.floor(random() * span),
+    episodeCount: 0,
+  }));
+
+  const shows = SERIES_TITLES.slice(0, 3).map((title, index) => {
+    const episodes = 1 + Math.floor(random() * 8);
+    return {
+      key: `demo-show-${index}`,
+      kind: "show" as const,
+      title,
+      subtitle: `${episodes} ${episodes === 1 ? "episode" : "episodes"}`,
+      year: stableYear(SERIES_TITLES, index, 1999, 2024),
+      summary: null,
+      thumb: null,
+      addedAt: to - Math.floor(random() * span),
+      episodeCount: episodes,
+    };
+  });
+
+  const days = Math.max(Math.round(span / 86400000), 1);
+  const playsByDay = Array.from({ length: days }, (_, index) => {
+    const date = new Date(from + index * 86400000);
+    return {
+      date: date.toISOString().slice(0, 10),
+      plays: Math.round(2 + random() * 12),
+    };
+  });
+
+  return {
+    added: [...films, ...shows].sort((a, b) => b.addedAt - a.addedAt),
+    topTitles: [
+      { label: "Severance", plays: 14 },
+      { label: "The Bear", plays: 9 },
+      { label: "Blade Runner 2049", plays: 4 },
+    ],
+    topUsers: [
+      { label: "steven", plays: 21 },
+      { label: "guest", plays: 6 },
+    ],
+    playsByDay,
+  };
+}
 
 function demoLibraryFull(): LibraryState & { items: LibraryItem[] } {
   const items: LibraryItem[] = [];

@@ -324,6 +324,46 @@ about a full disk roughly 30,000 times a day, so:
 
 ---
 
+## Newsletter
+
+A weekly digest in two editions: **viewer** ("new on the server", posters and
+titles) and **admin** (the same, plus what it cost in space, what people
+watched, and what broke).
+
+Read it at `/newsletter`, and preview exactly what will be mailed —
+`/api/newsletter/preview?edition=viewer` renders through the same renderer the
+mailer uses, so the preview can't drift from the real thing.
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=                      # an App Password, not your login
+SMTP_FROM=you@gmail.com
+
+NEWSLETTER_RECIPIENTS=friend@example.com
+NEWSLETTER_ADMIN_RECIPIENTS=you@example.com
+NEWSLETTER_ENABLED=1
+```
+
+**Sending stays off until `NEWSLETTER_ENABLED=1`.** Issues still generate and
+archive, so you can read a few first — this is the one feature whose mistakes
+land in someone else's inbox. The Delivery panel has a test send that goes to
+one address you type, never to the configured lists.
+
+Two things worth knowing about how it's built:
+
+- **The two editions are separated by the data model, not a filter.** The issue
+  object has `shared` and `admin` halves and the viewer edition never reads the
+  second, so there's no rule anyone has to remember in order to keep disk paths
+  out of a friend's email.
+- **Posters are attached, not linked.** The image proxy lives behind Tailscale,
+  so a linked poster is a broken image for anyone off the tailnet. They're
+  fetched server-side, resized, and embedded — which also means they display
+  with Gmail's remote images blocked, the default.
+
+---
+
 ## Demo mode
 
 To see the dashboard populated before connecting anything:

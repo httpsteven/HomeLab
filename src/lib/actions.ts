@@ -7,6 +7,9 @@ import { sonarr } from "@/lib/clients/sonarr";
 import { invalidateMedia } from "@/lib/aggregate/media-cache";
 import { refreshNow, refreshSoon } from "@/lib/collect/collector";
 import { sendTestAlert } from "@/lib/alerts";
+import { runNewsletterIfDue } from "@/lib/newsletter/schedule";
+import { sendIssue } from "@/lib/newsletter/send";
+import { latestIssue } from "@/lib/newsletter/store";
 import type { ArrClient } from "@/lib/clients/arr";
 
 /**
@@ -178,6 +181,34 @@ export const ACTIONS: Record<string, Handler> = {
   /* --- Alerts ------------------------------------------------------- */
   /** Delivery test. Sends only to endpoints you configured yourself. */
   "alerts.test": async () => sendTestAlert(),
+
+  /* --- Newsletter --------------------------------------------------- */
+  /** Build an issue now, regardless of the weekly schedule. Read-only over
+      the media clients; it only writes its own archive file. */
+  "newsletter.generate": async () => {
+    const result = await runNewsletterIfDue(true);
+    if (!result.issue) return { ok: false, message: "Couldn't build an issue." };
+    const { counts } = result.issue.shared;
+    return {
+      ok: true,
+      message:
+        `Issue ${result.issue.id}: ${counts.movies} films, ${counts.episodes} episodes. ` +
+        result.delivery.join(" "),
+    };
+  },
+
+  /** Sends the latest issue to ONE address, so a test can't reach the list. */
+  "newsletter.sendTest": async ({ params }) => {
+    const to = typeof params.to === "string" ? params.to.trim() : "";
+    if (!to.includes("@")) throw new Error('Missing or invalid "to" address');
+
+    const edition = params.edition === "viewer" ? "viewer" : "admin";
+    const issue = (await latestIssue()) ?? (await runNewsletterIfDue(true)).issue;
+    if (!issue) return { ok: false, message: "No issue to send." };
+
+    const result = await sendIssue(issue, edition, [to]);
+    return { ok: result.ok, message: result.message };
+  },
 
   /* --- Plex --------------------------------------------------------- */
   /** Disruptive but not destructive — it stops a playback session, it does

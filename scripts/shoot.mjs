@@ -25,6 +25,7 @@ const PAGES = [
   ["activity", "/activity"],
   ["health", "/health"],
   ["setup", "/setup"],
+  ["newsletter", "/newsletter"],
 ];
 
 const VIEWPORTS = [

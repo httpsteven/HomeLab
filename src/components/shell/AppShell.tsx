@@ -9,6 +9,7 @@ import {
   Library,
   Settings2,
   Cpu,
+  Mail,
   Clapperboard,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/activity", label: "Activity", Icon: Activity },
   { href: "/health", label: "Health", Icon: Cpu },
   { href: "/shorts", label: "Shorts", Icon: Clapperboard },
+  { href: "/newsletter", label: "Newsletter", Icon: Mail },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {

@@ -25,6 +25,7 @@ import {
 } from "./store";
 import { recordSnapshotIfDue } from "@/lib/history";
 import { evaluateAlerts } from "@/lib/alerts";
+import { runNewsletterIfDue } from "@/lib/newsletter/schedule";
 import { markCollectorStart } from "@/lib/alerts/state";
 import {
   demoActivity,
@@ -214,6 +215,10 @@ async function runSource(source: Source): Promise<void> {
     // Storage refresh is also when a history snapshot is due.
     if (source.key === "storage") {
       void recordSnapshotIfDue().catch(() => {});
+      // And when the weekly issue is checked. Hung off the slowest source on
+      // purpose — a weekly job has no business running on the 2s cadence, and
+      // the archive on disk is what actually decides whether it's due.
+      void runNewsletterIfDue().catch(() => {});
     }
 
     schedule(source, source.intervalMs);
