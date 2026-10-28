@@ -1,5 +1,6 @@
 import { listAudit } from "@/lib/aggregate/shorts";
 import { shortsAvailable } from "@/lib/clients/shorts";
+import { isExcluded } from "@/lib/exclusions";
 
 /** The full subtitle audit table. Same on-demand reasoning as /clips. */
 
@@ -12,7 +13,9 @@ export async function GET() {
   }
   try {
     return Response.json(
-      { rows: listAudit(), error: null },
+      // Excluded titles are dropped here rather than in the UI, so every
+      // consumer of this route gets the same library.
+      { rows: listAudit().filter((row) => !isExcluded(row.path, row.title)), error: null },
       { headers: { "Cache-Control": "private, max-age=15" } },
     );
   } catch (error) {

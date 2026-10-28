@@ -1,6 +1,7 @@
 import "server-only";
 import { tautulli, type RecentlyAddedItem } from "@/lib/clients/tautulli";
 import { getState } from "@/lib/collect/store";
+import { isExcluded } from "@/lib/exclusions";
 import { alertingServices } from "@/lib/config";
 import { readHistory } from "@/lib/history";
 import { demoNewsletter, isDemoMode } from "@/lib/demo";
@@ -76,6 +77,9 @@ function groupAdded(items: RecentlyAddedItem[], since: number): AddedItem[] {
   for (const item of items) {
     const addedAt = Number(item.added_at) * 1000;
     if (!Number.isFinite(addedAt) || addedAt < since) continue;
+
+    // A duplicate copy of something you already own is not news.
+    if (isExcluded(item.title, item.parent_title, item.grandparent_title)) continue;
 
     if (item.media_type === "movie") {
       movies.push({

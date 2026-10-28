@@ -1,6 +1,7 @@
 import { buildLibraryItems } from "@/lib/aggregate/library";
 import { demoLibraryItems, isDemoMode } from "@/lib/demo";
 import type { LibraryItem } from "@/lib/types";
+import { isExcluded } from "@/lib/exclusions";
 
 /**
  * The full library item list, on demand.
@@ -37,7 +38,9 @@ export async function GET(request: Request) {
       : await buildLibraryItems();
 
     if (compact) {
-      const slim: CompactLibraryItem[] = items.map((item) => ({
+      const slim: CompactLibraryItem[] = items
+        .filter((item) => !isExcluded(item.title))
+        .map((item) => ({
         id: item.id,
         kind: item.kind,
         title: item.title,
