@@ -1,0 +1,38 @@
+# Keep the build context to what the image actually needs.
+#
+# THIS FILE IS LOAD-BEARING, not housekeeping. The Dockerfile installs clean
+# dependencies in the `deps` stage and copies them forward, and then `COPY . .`
+# in the builder stage copies the build context over the top. Without
+# node_modules excluded here, whatever happens to be on the build host's disk
+# silently replaces the tree npm ci just resolved from the lockfile — so the
+# image ships the host's dependencies and the lockfile is decorative. That is
+# exactly how a patched Next release was built into an image that still
+# contained the vulnerable one.
+node_modules
+.next
+
+# Runtime state. data/ is a bind mount in compose, so a copy baked into the
+# image would only ever be a stale shadow of it.
+data
+shots
+
+# Secrets. Compose reads .env.local on the host and passes the values in at
+# run time; nothing here is needed to build, and a credential baked into an
+# image layer outlives any attempt to remove it.
+.env
+.env.local
+.env.*.local
+
+# Not part of the application.
+.git
+.gitignore
+.github
+.claude
+Dockerfile
+.dockerignore
+docker-compose*.yml
+README.md
+AGENTS.md
+CLAUDE.md
+npm-debug.log*
+.DS_Store
