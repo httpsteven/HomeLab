@@ -35,11 +35,36 @@ const nextConfig: NextConfig = {
   //
   // These three go in whole. A few hundred KB is a fair price for transports
   // that fail loudly at build time rather than silently at runtime.
+  // signalr's own dependency closure is listed explicitly rather than left to
+  // tracing. Tracing cannot see through a require() inside an external
+  // package, so each missing module only announces itself at runtime, one
+  // redeploy at a time: ws, then eventsource, then whatever is next. This is
+  // the whole list from its package.json, so there is no next one.
   outputFileTracingIncludes: {
     "/*": [
-      "./node_modules/ws/**/*",
       "./node_modules/@microsoft/signalr/**/*",
       "./node_modules/socket.io-client/**/*",
+      // @microsoft/signalr
+      "./node_modules/ws/**/*",
+      "./node_modules/eventsource/**/*",
+      "./node_modules/abort-controller/**/*",
+      "./node_modules/fetch-cookie/**/*",
+      "./node_modules/node-fetch/**/*",
+      // transitive, via node-fetch and fetch-cookie
+      "./node_modules/tough-cookie/**/*",
+      "./node_modules/whatwg-url/**/*",
+      "./node_modules/tr46/**/*",
+      "./node_modules/webidl-conversions/**/*",
+      "./node_modules/event-target-shim/**/*",
+      "./node_modules/set-cookie-parser/**/*",
+      // socket.io-client
+      "./node_modules/@socket.io/**/*",
+      "./node_modules/engine.io-client/**/*",
+      "./node_modules/engine.io-parser/**/*",
+      "./node_modules/socket.io-parser/**/*",
+      "./node_modules/xmlhttprequest-ssl/**/*",
+      "./node_modules/debug/**/*",
+      "./node_modules/ms/**/*",
     ],
   },
 };
