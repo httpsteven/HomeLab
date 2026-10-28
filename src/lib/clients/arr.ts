@@ -70,6 +70,16 @@ export interface QueueResponse {
 
 export type ArrKind = Extract<ServiceId, "sonarr" | "radarr">;
 
+export interface ArrLookupResult {
+  title: string;
+  year?: number;
+  tvdbId?: number;
+  tmdbId?: number;
+  titleSlug?: string;
+  images?: unknown[];
+  seasons?: unknown[];
+}
+
 export class ArrClient {
   constructor(readonly kind: ArrKind) {}
 
@@ -115,6 +125,51 @@ export class ArrClient {
 
   rootFolders() {
     return this.call<RootFolder[]>("/rootfolder");
+  }
+
+  /**
+   * Folders inside a root that aren't attached to anything.
+   *
+   * This is what the Library Import screen lists — the gaps.
+   */
+  unmappedFolders() {
+    return this.call<
+      { path: string; unmappedFolders?: { name: string; path: string }[] }[]
+    >("/rootfolder");
+  }
+
+  /** Catalogue search. Sonarr answers from TVDB, Radarr from TMDB. */
+  lookup(term: string) {
+    const path = this.kind === "sonarr" ? "/series/lookup" : "/movie/lookup";
+    return this.call<ArrLookupResult[]>(`${path}?term=${encodeURIComponent(term)}`);
+  }
+
+  /** Everything currently in the library, for the "already have it" check. */
+  libraryIds() {
+    const path = this.kind === "sonarr" ? "/series" : "/movie";
+    return this.call<ArrLookupResult[]>(path);
+  }
+
+  /**
+   * Adopts an existing folder.
+   *
+   * `path` is set explicitly to the folder already on disk, which is what
+   * makes this an adoption rather than a move — verified by inode before and
+   * after. Searching is off: the files are already here, and a library import
+   * that starts downloading is a library import nobody asked for.
+   */
+  addExisting(payload: Record<string, unknown>) {
+    const path = this.kind === "sonarr" ? "/series" : "/movie";
+    return this.call<{ id: number; path: string }>(path, {
+      method: "POST",
+      body: {
+        ...payload,
+        addOptions:
+          this.kind === "sonarr"
+            ? { searchForMissingEpisodes: false, searchForCutoffUnmetEpisodes: false }
+            : { searchForMovie: false },
+      },
+    });
   }
 
   qualityProfiles() {

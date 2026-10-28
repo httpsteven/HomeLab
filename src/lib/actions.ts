@@ -12,6 +12,7 @@ import { sendIssue } from "@/lib/newsletter/send";
 import { latestIssue } from "@/lib/newsletter/store";
 import { writeMailSettings } from "@/lib/settings";
 import { BAZARR_TASKS } from "@/lib/bazarr-tasks";
+import { runGapFillIfDue } from "@/lib/collect/gap-schedule";
 import type { ArrClient } from "@/lib/clients/arr";
 
 /**
@@ -202,6 +203,31 @@ export const ACTIONS: Record<string, Handler> = {
     refreshSoon("subtitles", 4_000);
     // Bazarr queues rather than blocks, so this says started, not finished.
     return { ok: true, message: `${task.label} started.` };
+  },
+
+  /**
+   * Fills library gaps now, instead of waiting for the daily run.
+   *
+   * Honours IMPORT_FILL_GAPS exactly as the schedule does: with it unset this
+   * reports what it would do and writes nothing. A manual button that is more
+   * powerful than the scheduled job would be a nasty surprise.
+   */
+  "library.fillGaps": async () => {
+    const runs = await runGapFillIfDue(true);
+    if (!runs) return { ok: false, message: "Nothing to do." };
+
+    const imported = runs.reduce((sum, run) => sum + run.imported.length, 0);
+    const skipped = runs.reduce((sum, run) => sum + run.skipped.length, 0);
+    const failed = runs.reduce((sum, run) => sum + run.failed.length, 0);
+    const dry = runs.some((run) => run.dryRun);
+
+    refreshSoon("library", 3_000);
+    return {
+      ok: failed === 0,
+      message: dry
+        ? `Would import ${imported}, skip ${skipped}. Set IMPORT_FILL_GAPS=1 to apply.`
+        : `Imported ${imported}, skipped ${skipped}${failed ? `, ${failed} failed` : ""}.`,
+    };
   },
 
   /* --- Alerts ------------------------------------------------------- */

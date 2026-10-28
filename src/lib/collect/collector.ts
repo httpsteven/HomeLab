@@ -26,6 +26,7 @@ import {
 import { recordSnapshotIfDue } from "@/lib/history";
 import { evaluateAlerts } from "@/lib/alerts";
 import { runNewsletterIfDue } from "@/lib/newsletter/schedule";
+import { runGapFillIfDue } from "./gap-schedule";
 import { markCollectorStart } from "@/lib/alerts/state";
 import {
   demoActivity,
@@ -219,6 +220,9 @@ async function runSource(source: Source): Promise<void> {
       // purpose — a weekly job has no business running on the 2s cadence, and
       // the archive on disk is what actually decides whether it's due.
       void runNewsletterIfDue().catch(() => {});
+      // And the daily library gap check, hung off the same slow source for
+      // the same reason. It writes nothing unless IMPORT_FILL_GAPS=1.
+      void runGapFillIfDue().catch(() => {});
     }
 
     schedule(source, source.intervalMs);
