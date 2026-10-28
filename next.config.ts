@@ -24,6 +24,24 @@ const nextConfig: NextConfig = {
     "@microsoft/signalr",
     "socket.io-client",
   ],
+
+  // Marking a package external keeps it out of the bundle; it does NOT
+  // guarantee the standalone output ships all of it. Tracing follows the
+  // imports it can see, and it saw `ws` only through its ESM wrapper — so the
+  // copy in the image had lib/ and wrapper.mjs but no index.js, which is the
+  // CommonJS entry that signalr's require() resolves. Plex's socket kept
+  // working (it takes the ESM path) while Sonarr and Radarr could not load the
+  // module at all: the same package, present but half-copied.
+  //
+  // These three go in whole. A few hundred KB is a fair price for transports
+  // that fail loudly at build time rather than silently at runtime.
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/ws/**/*",
+      "./node_modules/@microsoft/signalr/**/*",
+      "./node_modules/socket.io-client/**/*",
+    ],
+  },
 };
 
 export default nextConfig;
