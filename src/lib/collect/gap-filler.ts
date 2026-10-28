@@ -113,12 +113,22 @@ export async function fillGaps(
         ? { ...base, tvdbId: decision.match.tvdbId, seriesType: "standard", seasonFolder: true }
         : { ...base, tmdbId: decision.match.tmdbId, minimumAvailability: "released" };
 
-    const result = await client.addExisting(payload);
+    let result = await client.addExisting(payload);
+
+    // A 409 from Radarr is usually transient — it surfaces when the service is
+    // mid-refresh from the add before this one, and the identical request
+    // succeeds moments later. Observed in a real run: one film failed with
+    // 409 and went in unchanged on a retry. One retry only, because a genuine
+    // conflict will answer 409 again and deserves to be reported rather than
+    // hammered.
+    if (!result.ok && /\b409\b/.test(result.message)) {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      result = await client.addExisting(payload);
+    }
+
     if (result.ok) {
       run.imported.push({ folder: decision.folder, title: decision.match.title });
     } else {
-      // A failure is reported, never retried in a loop: whatever the service
-      // objected to will still be true a second later.
       run.failed.push({ folder: decision.folder, reason: result.message });
     }
   }
