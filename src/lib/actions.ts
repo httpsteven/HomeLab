@@ -11,6 +11,7 @@ import { runNewsletterIfDue } from "@/lib/newsletter/schedule";
 import { sendIssue } from "@/lib/newsletter/send";
 import { latestIssue } from "@/lib/newsletter/store";
 import { writeMailSettings } from "@/lib/settings";
+import { BAZARR_TASKS } from "@/lib/bazarr-tasks";
 import type { ArrClient } from "@/lib/clients/arr";
 
 /**
@@ -177,6 +178,30 @@ export const ACTIONS: Record<string, Handler> = {
     if (!result.ok) return { ok: false, message: result.message };
     refreshSoon("subtitles", 2_000);
     return { ok: true, message: "Searching for subtitles." };
+  },
+
+  /**
+   * Runs one of Bazarr's own scheduled tasks now.
+   *
+   * The task id comes from a fixed allowlist, not from the browser, for the
+   * same reason every other action here takes a name rather than a URL.
+   *
+   * `update_bazarr` is deliberately NOT on it. It is a real Bazarr task, and
+   * it updates Bazarr itself — which is a privileged action wearing the same
+   * clothes as a library sync. Upgrades happen through the package manager
+   * where they can be reviewed, not from a button on a dashboard.
+   */
+  "bazarr.runTask": async ({ params }) => {
+    const id = typeof params.task === "string" ? params.task : "";
+    const task = BAZARR_TASKS.find((entry) => entry.id === id);
+    if (!task) throw new Error(`Unknown Bazarr task "${id}".`);
+
+    const result = await bazarr.runTask(task.id);
+    if (!result.ok) return { ok: false, message: result.message };
+
+    refreshSoon("subtitles", 4_000);
+    // Bazarr queues rather than blocks, so this says started, not finished.
+    return { ok: true, message: `${task.label} started.` };
   },
 
   /* --- Alerts ------------------------------------------------------- */

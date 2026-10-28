@@ -27,6 +27,15 @@ export interface BazarrStatus {
   };
 }
 
+export interface BazarrTask {
+  name: string;
+  job_id: string;
+  interval: string;
+  next_run_in?: string;
+  next_run_time?: string;
+  job_running?: boolean;
+}
+
 export interface BazarrProvider {
   name: string;
   status: string;
@@ -103,6 +112,23 @@ class BazarrClient {
   wantedMovies(length = 50) {
     return this.call<{ data: WantedMovie[]; total: number }>("/movies/wanted", {
       params: { start: 0, length },
+    });
+  }
+
+  tasks() {
+    return this.call<{ data: BazarrTask[] }>("/system/tasks");
+  }
+
+  /**
+   * Runs one of Bazarr's own scheduled tasks now.
+   *
+   * 204 and an empty body on success — Bazarr queues the job rather than
+   * waiting for it, so a response here means "accepted", not "finished".
+   */
+  runTask(taskId: string) {
+    return this.call<unknown>("/system/tasks", {
+      method: "POST",
+      params: { taskid: taskId },
     });
   }
 
