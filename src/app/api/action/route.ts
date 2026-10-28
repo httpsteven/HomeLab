@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { ACTIONS, isKnownAction } from "@/lib/actions";
+import { SESSION_COOKIE, authConfigured, verifySession } from "@/lib/auth";
 
 /**
  * The only write endpoint in the app.
@@ -7,12 +9,24 @@ import { ACTIONS, isKnownAction } from "@/lib/actions";
  * allowlist, and runs the handler. There is no passthrough: an unknown name
  * is rejected outright, so the browser cannot reach an arbitrary Servarr
  * command or URL even if this route is called by hand.
+ *
+ * The session is checked HERE as well as in the proxy. Next's own guidance is
+ * that the proxy layer is an optimistic check rather than an authorization
+ * boundary, and this is the one route in the app with side effects — the
+ * check belongs next to the thing it protects, not only in front of it.
  */
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (authConfigured()) {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (!(await verifySession(token))) {
+      return Response.json({ ok: false, message: "Not signed in." }, { status: 401 });
+    }
+  }
+
   let body: { action?: unknown; params?: unknown };
 
   try {

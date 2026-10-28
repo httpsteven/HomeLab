@@ -339,6 +339,23 @@ with `ALERT_SERVICES=none`. The weekly admin issue uses the same rule, so
 "needs attention" means one thing rather than two.
 
 
+## Signing in
+
+The dashboard is ungated by default. Set `DASHBOARD_PASSWORD` and every page,
+plus the action endpoint, requires a session; leave it unset and nothing
+changes.
+
+It is one shared password, not accounts — this guards one person's lab on a
+tailnet, and every extra concept is one more thing to get wrong. The session
+is a signed cookie carrying nothing but its own expiry, so there is no store
+to keep and changing the password invalidates every existing session.
+
+The check runs in two places. `proxy.ts` redirects browsers and returns 401 to
+API callers, and `/api/action` — the one route with side effects — verifies
+again on its own, because Next's guidance is explicitly that the proxy layer
+is an optimistic check rather than an authorization boundary.
+
+
 ## Newsletter
 
 A weekly digest in two editions: **viewer** ("new on the server", posters and

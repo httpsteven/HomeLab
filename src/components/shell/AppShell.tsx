@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Search } from "lucide-react";
 import { ConnectionIndicator } from "./ConnectionIndicator";
+import { SignOutButton } from "@/components/SignOutButton";
 import { Logo } from "@/components/ui/Logo";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { PaletteProvider, usePalette } from "@/components/palette/PaletteProvider";
@@ -31,6 +32,13 @@ const NAV = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
+  // The login page gets no chrome: a nav you cannot use and a command palette
+  // that searches data you cannot see are worse than nothing, and the palette
+  // would be sitting on a keyboard shortcut for a signed-out visitor.
+  if (pathname === "/login") return <>{children}</>;
+
   return (
     <PaletteProvider>
       <Shell>{children}</Shell>
@@ -117,6 +125,7 @@ function Shell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             <PaletteTrigger />
             <ConnectionIndicator />
+            <SignOutButton />
             <Link
               href="/setup"
               aria-current={pathname.startsWith("/setup") ? "page" : undefined}

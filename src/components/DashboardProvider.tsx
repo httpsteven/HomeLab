@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import type { DashboardState, Slot, SlotKey } from "@/lib/types";
 import { hexToRgbTripletClient } from "@/lib/color-client";
 
@@ -45,8 +46,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
+  const pathname = usePathname();
+  // Signed out, /api/stream answers 401 and EventSource retries it forever.
+  // Nothing to show and a reconnect loop behind the login form.
+  const onLoginPage = pathname === "/login";
 
   useEffect(() => {
+    if (onLoginPage) return;
     let disposed = false;
 
     const connect = () => {
@@ -109,7 +115,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       disconnect();
     };
-  }, []);
+  }, [onLoginPage]);
 
   /* --- Ambient wash ----------------------------------------------------
      The signature move: the page takes on the colour of whatever is playing,
