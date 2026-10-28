@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/shell/AppShell";
 import { LibraryView } from "@/components/panels/LibraryView";
 import { BazarrTasks } from "@/components/panels/BazarrTasks";
+import { LibraryAutomation } from "@/components/panels/LibraryAutomation";
 import { BentoGrid } from "@/components/ui/Panel";
 
 export default function LibraryPage() {
@@ -12,6 +13,7 @@ export default function LibraryPage() {
       />
       <BentoGrid>
         <LibraryView />
+        <LibraryAutomation />
         <BazarrTasks />
       </BentoGrid>
     </>
